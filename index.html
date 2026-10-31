@@ -12,6 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon-32.png" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <script>try{var t=localStorage.getItem('patrimonio-tema');if(t==='claro'||t==='oscuro')document.documentElement.dataset.theme=t}catch(e){}</script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -23,11 +24,11 @@
   <main id="vista" class="vista" tabindex="-1"></main>
 
   <nav class="tabs" aria-label="Secciones">
-    <a href="#panel" data-tab="panel"><span class="ico" aria-hidden="true">◎</span>Panel</a>
+    <a href="#panel" data-tab="panel"><span class="ico" aria-hidden="true">⌂</span>Inicio</a>
     <a href="#gastos" data-tab="gastos"><span class="ico" aria-hidden="true">−</span>Gastos</a>
+    <a href="#inversion" data-tab="inversion"><span class="ico" aria-hidden="true">↗</span>Inversión</a>
     <a href="#saldos" data-tab="saldos"><span class="ico" aria-hidden="true">€</span>Saldos</a>
-    <a href="#cartera" data-tab="cartera"><span class="ico" aria-hidden="true">↗</span>Cartera</a>
-    <a href="#mas" data-tab="mas"><span class="ico" aria-hidden="true">≡</span>Más</a>
+    <a href="#ajustes" data-tab="ajustes"><span class="ico" aria-hidden="true">⚙</span>Ajustes</a>
   </nav>
 
   <dialog id="dialogo">

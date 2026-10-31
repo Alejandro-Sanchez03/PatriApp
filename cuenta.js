@@ -400,7 +400,7 @@ async function cerrarSesion({sinPreguntar} = {}) {
 /* ───────────────────────── Vista: Cuenta y seguridad ───────────────────────── */
 
 function vistaCuenta() {
-  const volverMas = h('a', {class: 'back', href: '#mas'}, '← Más');
+  const volverMas = h('a', {class: 'back', href: '#ajustes'}, '← Ajustes');
   if (!CONFIGURADO) {
     return [volverMas, h('section', {class: 'card'},
       h('h2', null, 'Cuenta'),

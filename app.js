@@ -17,6 +17,7 @@ const DEFAULT_CONFIG = {
   pctTR: 0.35,       // parte de lo que sobra que va a la cuenta remunerada
   margen: 250,       // € que se quedan en la cuenta corriente además de los gastos previstos
   cuotaCoche: 0,     // € al mes de la cuota del coche (0 = no mostrar)
+  interesTR: 0,      // % TAE de la cuenta remunerada (0 = no mostrar intereses)
   preciosAuto: true, // al abrir, aplicar los precios de precios.json del repositorio
   fuentePrecios: ''  // dirección de precios.json ('' = la del propio repositorio de GitHub)
 };
@@ -131,7 +132,7 @@ function normalize(raw) {
   const s = emptyState();
   if (!raw || typeof raw !== 'object') return s;
   s.config = {...DEFAULT_CONFIG, ...(raw.config && typeof raw.config === 'object' ? raw.config : {})};
-  for (const k of ['mesesColchon', 'pctTR', 'margen', 'cuotaCoche']) s.config[k] = Number(s.config[k]) || 0;
+  for (const k of ['mesesColchon', 'pctTR', 'margen', 'cuotaCoche', 'interesTR']) s.config[k] = Number(s.config[k]) || 0;
   s.config.nombre = String(s.config.nombre || '');
   s.config.preciosAuto = s.config.preciosAuto !== false;
   s.config.fuentePrecios = String(s.config.fuentePrecios || '');
@@ -253,7 +254,11 @@ function ultimaNomina(st) {
 /* Gastos del mes siguiente a la última nómina: previsto (presupuesto) frente a gastado. */
 function calcMesGastos(st) {
   const nom = ultimaNomina(st);
-  const mes = nom ? mesSiguiente(nom) : hoy().slice(0, 7);
+  return calcGastosMes(st, nom ? mesSiguiente(nom) : hoy().slice(0, 7));
+}
+
+/* Previsto (presupuesto) frente a gastado en un mes concreto, por categoría. */
+function calcGastosMes(st, mes) {
   const rows = st.presupuesto.filter((r) => r.mes === mes).map((r) => ({
     concepto: r.concepto, previsto: r.cantidad * r.precio, gastado: 0, pendiente: r.pendiente
   }));
@@ -356,7 +361,6 @@ function vistaPanel() {
   const mg = calcMesGastos(st);
   const col = calcColchon(st, mg);
   const rep = calcReparto(st, mg);
-  const cat = calcGastosCat(st);
   const out = [];
 
   if (!st.saldos.length && !st.gastos.length) {
@@ -368,116 +372,72 @@ function vistaPanel() {
         h('a', {class: 'btn', href: '#saldos'}, 'Añadir cuentas'))));
   }
 
-  out.push(h('p', {class: 'intro'},
-    'Tienes ', h('b', null, eur0.format(res.patrimonio)), ' en total.',
-    rep && !rep.cerrada ? [' Con la nómina de ', mesNombre(rep.nomina), ' puedes mover ', h('b', null, eur0.format(rep.aMover)), ' a ahorro e inversión.'] : null));
-
-  // Delta respecto a la foto anterior
+  // Variación respecto a la foto anterior de saldos
   const hist = st.historial.slice().sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
-  let delta = h('span', {class: 'sub'}, hist.length ? 'Primer registro: ' + fechaCorta(hist[0].fecha) : 'Guarda tus saldos para ver la evolución');
+  let delta = h('span', {class: 'heroe-sub'}, hist.length ? 'Primer registro: ' + fechaCorta(hist[0].fecha) : 'Guarda tus saldos para ver cómo cambia');
   if (hist.length >= 2) {
     const d = totHist(hist[hist.length - 1]) - totHist(hist[hist.length - 2]);
-    delta = h('span', {class: 'sub ' + (d >= 0 ? 'ok' : 'bad')}, signed(d) + ' desde el ' + fechaCorta(hist[hist.length - 2].fecha));
+    delta = h('span', {class: 'heroe-sub'}, h('span', {class: d >= 0 ? 'ok' : 'bad'}, signed(d)), ' desde el ' + fechaCorta(hist[hist.length - 2].fecha));
   }
 
-  const cuenta = (grupo) => st.saldos.filter((r) => r.grupo === grupo);
-  const tiles = [
-    tile('Patrimonio neto', eur2.format(res.patrimonio), delta),
-    tile('Dinero disponible', eur2.format(res.liquidez), 'Cuenta corriente y efectivo: lo demás no lo tocas')
-  ];
-  const rem = cuenta('Cuenta remunerada');
-  if (rem.length) tiles.push(tile(rem.map((r) => r.entidad || r.cuenta).join(' + '), eur2.format(sum(rem, (r) => r.saldo)), 'Cuenta remunerada'));
-  const efe = cuenta('Efectivo');
-  if (efe.length) tiles.push(tile('Efectivo en casa', eur2.format(sum(efe, (r) => r.saldo)), 'Cuenta como disponible'));
-  if (res.inversion || st.cartera.length) {
-    tiles.push(tile('Inversión', eur2.format(res.inversion),
-      st.cartera.length ? eur2.format(res.fondos) + ' en fondos' : 'Añade tus fondos en «Cartera»',
-      st.cartera.length ? h('span', {class: 'sub'}, h('span', {class: res.ganancia >= 0 ? 'ok' : 'bad'}, signed(res.ganancia)), ' (' + (res.rentabilidad >= 0 ? '+' : '') + pct1.format(res.rentabilidad) + ') sobre ' + eur2.format(res.invertido) + ' aportados') : null));
-  }
-  tiles.push(tile('Colchón · emergencia + remunerada',
-    col.gastoMes ? col.meses.toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' meses' : '—',
-    col.gastoMes
-      ? h('span', {class: 'sub'}, 'Objetivo ' + st.config.mesesColchon + ' meses: ', h('span', {class: col.falta > 0 ? 'warn' : 'ok'}, col.falta > 0 ? 'faltan ' + eur0.format(col.falta) : 'completo'))
-      : 'Añade gastos previstos para calcularlo'));
-  out.push(h('section', {class: 'tiles'}, tiles));
+  // Lo principal, en grande
+  const mini = (label, valor, href) => h('a', {class: 'mini', href}, h('span', {class: 'lbl'}, label), h('span', {class: 'mini-num'}, valor));
+  out.push(h('section', {class: 'heroe', 'aria-label': 'Patrimonio neto'},
+    h('span', {class: 'heroe-lbl'}, 'Patrimonio neto'),
+    h('span', {class: 'heroe-num'}, eur2.format(res.patrimonio)),
+    delta,
+    h('div', {class: 'mini-fila'},
+      mini('Disponible', eur0.format(res.liquidez), '#saldos'),
+      mini('Inversión', eur0.format(res.inversion + sum(st.saldos.filter((r) => r.grupo === 'Cuenta remunerada'), (r) => r.saldo)), '#inversion'),
+      mini('Colchón', col.gastoMes ? col.meses.toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' meses' : '—', '#saldos'))));
 
-  // Reparto + dónde está el dinero
-  const grid1 = h('div', {class: 'grid'});
+  // Gastos de este mes, en corto
+  const mesHoy = hoy().slice(0, 7);
+  const gm = calcGastosMes(st, mesHoy);
+  out.push(h('a', {class: 'card card-enlace', href: '#gastos'},
+    h('div', {class: 'fila-sep'}, h('h2', null, 'Gastos de ' + mesNombre(mesHoy)), h('span', {class: 'flecha', 'aria-hidden': 'true'}, '›')),
+    h('div', {class: 'fila-sep'},
+      h('span', {class: 'big'}, eur0.format(gm.gastado)),
+      gm.previsto ? h('span', {class: 'sub'}, 'de ' + eur0.format(gm.previsto) + ' previstos') : null),
+    gm.previsto ? h('span', {class: 'track'}, h('span', {class: 'fill', style: `width:${Math.min(100, Math.max(0, gm.gastado) / gm.previsto * 100)}%;background:${gm.gastado > gm.previsto ? css('--bad') : css('--accent')}`})) : null));
+
+  // Reparto de la nómina
   if (rep) {
     const colores = [css('--c2'), css('--c0'), css('--muted-bar')];
-    const tb = h('tbody', null, rep.rows.map((x, i) => h('tr', null,
-      h('td', null, h('span', {class: 'dot', style: 'background:' + colores[i]}), x.destino),
-      h('td', null, eur2.format(x.importe)),
-      x.otra ? [h('td', null, '·'), h('td', null, '·')]
-        : [h('td', {class: x.hecho > 0 ? 'ok' : ''}, eur2.format(x.hecho)), h('td', {class: x.pendiente > 0 ? 'warn' : 'ok'}, x.pendiente > 0 ? eur2.format(x.pendiente) : 'Hecho')])));
     const c = st.config;
-    const coche = cuenta('Apartado para el coche');
-    grid1.append(h('section', {class: 'card'},
+    const coche = st.saldos.filter((r) => r.grupo === 'Apartado para el coche');
+    out.push(h('section', {class: 'card'},
       h('h2', null, 'Qué hacer con la nómina de ' + mesNombre(rep.nomina)),
       h('p', {class: 'note'}, 'En la cuenta corriente se quedan los gastos previstos de ' + mesNombre(mg.mes) + ' más ' + eur0.format(c.margen) + ' de margen. Lo que sobra va ' + pct0.format(c.pctTR) + ' a la cuenta remunerada y ' + pct0.format(1 - c.pctTR) + ' a la cartera, en decenas.' + (rep.cerrada ? ' Esta nómina ya está cerrada: ves lo que moviste.' : '')),
-      h('div', {class: 'tw'}, h('table', null, h('thead', null, h('tr', null, h('th', null, 'Destino'), h('th', null, 'Importe'), h('th', null, 'Hecho'), h('th', null, 'Pendiente'))), tb)),
+      h('div', {class: 'tw'}, h('table', null,
+        h('thead', null, h('tr', null, h('th', null, 'Destino'), h('th', null, 'Importe'), h('th', null, 'Pendiente'))),
+        h('tbody', null, rep.rows.map((x, i) => h('tr', null,
+          h('td', null, h('span', {class: 'dot', style: 'background:' + colores[i]}), x.destino),
+          h('td', null, eur2.format(x.importe)),
+          x.otra ? h('td', null, '·') : h('td', {class: x.pendiente > 0 ? 'warn' : 'ok'}, x.pendiente > 0 ? eur2.format(x.pendiente) : 'Hecho')))))),
       c.cuotaCoche > 0 && coche.length
-        ? h('p', {class: 'note'}, 'La cuota del coche (' + eur2.format(c.cuotaCoche) + ' al mes) no cuenta como gasto: la cubre la cuenta del coche, que da para ', h('b', null, String(Math.floor(sum(coche, (r) => r.saldo) / c.cuotaCoche))), ' cuotas.')
+        ? h('p', {class: 'note'}, 'La cuota del coche (' + eur2.format(c.cuotaCoche) + ' al mes) la cubre la cuenta del coche, que da para ', h('b', null, String(Math.floor(sum(coche, (r) => r.saldo) / c.cuotaCoche))), ' cuotas.')
         : null,
-      h('div', {class: 'btns'}, h('button', {class: 'btn sm', type: 'button', onclick: () => editRow('movimientos', null, {fecha: hoy(), mes_nomina: rep.nomina, destino: DESTINOS[0]})}, 'Apuntar transferencia'))));
-  } else {
-    grid1.append(h('section', {class: 'card'}, h('h2', null, 'Reparto de la nómina'), emptyMsg('Apunta tu nómina para ver cuánto mover a ahorro e inversión.', '#nominas', 'Ir a nóminas')));
+      h('div', {class: 'btns'},
+        h('button', {class: 'btn sm', type: 'button', onclick: () => editRow('movimientos', null, {fecha: hoy(), mes_nomina: rep.nomina, destino: DESTINOS[0]})}, 'Apuntar transferencia'),
+        h('a', {class: 'btn sm', href: '#nominas'}, 'Nóminas'))));
   }
 
+  // Dónde está el dinero
   const saldosOrd = st.saldos.slice().sort((a, b) => b.saldo - a.saldo);
   const maxS = Math.max(1, ...saldosOrd.map((r) => r.saldo));
   const colGrupo = {'Fondo de emergencia': css('--c1'), 'Cuenta remunerada': css('--c2'), 'Inversión': css('--c0')};
-  grid1.append(h('section', {class: 'card'},
-    h('h2', null, 'Dónde está tu dinero'),
-    hist.length ? h('p', {class: 'note'}, 'Última foto de saldos: ' + fechaLarga(hist[hist.length - 1].fecha)) : null,
-    saldosOrd.length
-      ? barList(saldosOrd.map((r) => ({label: r.cuenta, extra: r.entidad, valor: r.saldo, max: maxS, color: colGrupo[r.grupo] || css('--muted-bar'), valueText: eur2.format(r.saldo)})))
-      : emptyMsg('Sin cuentas todavía.', '#saldos', 'Añadir cuentas')));
-  out.push(grid1);
-
-  // Gastos del mes: previsto vs gastado + últimos gastos
-  const grid2 = h('div', {class: 'grid'});
-  const maxG = Math.max(1, ...mg.rows.map((x) => Math.max(x.previsto, x.gastado)));
-  grid2.append(h('section', {class: 'card'},
-    h('h2', null, 'Gastos de ' + mesNombre(mg.mes) + ': previsto y gastado'),
-    h('p', {class: 'note'}, 'Previsto: ', h('b', null, eur0.format(mg.previsto)), '. Gastado hasta ahora: ', h('b', null, eur0.format(mg.gastado)), '.'),
-    mg.rows.length
-      ? barList(mg.rows.map((x) => ({
-        label: x.concepto, extra: x.pendiente ? 'pendiente de cifra' : null, extraClass: 'warn',
-        valor: x.gastado, max: maxG, color: x.gastado > x.previsto ? css('--bad') : css('--c0'),
-        fondo: {valor: x.previsto, color: css('--muted-bar')},
-        valueText: eur0.format(x.gastado) + ' de ' + eur0.format(x.previsto),
-        valueClass: x.gastado > x.previsto && x.previsto > 0 ? 'bad' : ''
-      })))
-      : emptyMsg('No hay gastos previstos para ' + mesNombre(mg.mes) + '.', '#presupuesto', 'Añadir presupuesto')));
-
-  const ult = st.gastos.slice().sort((a, b) => (a.fecha < b.fecha ? 1 : -1)).slice(0, 8);
-  grid2.append(h('section', {class: 'card'},
-    h('h2', null, 'Últimos gastos'),
-    ult.length
-      ? h('div', {class: 'tw'}, h('table', null,
-        h('thead', null, h('tr', null, h('th', null, 'Fecha'), h('th', null, 'Concepto'), h('th', null, 'Importe'))),
-        h('tbody', null, ult.map((g) => h('tr', null, h('td', null, fechaCorta(g.fecha)), h('td', {style: 'text-align:left'}, g.concepto), h('td', {class: g.importe < 0 ? 'ok' : ''}, eur2.format(g.importe)))))))
-      : emptyMsg('Todavía no hay gastos apuntados.'),
-    h('div', {class: 'btns'}, h('a', {class: 'btn sm', href: '#gastos'}, st.gastos.length ? 'Ver los ' + st.gastos.length + ' gastos' : 'Apuntar un gasto'))));
-  out.push(grid2);
-
-  // Gastos reales por categoría
-  if (cat.rows.length) {
-    const maxC = Math.max(1, ...cat.rows.map((x) => x.importe));
+  if (saldosOrd.length) {
     out.push(h('section', {class: 'card'},
-      h('h2', null, 'Gastos reales de ' + mesNombre(cat.mes) + ' por categoría'),
-      h('p', {class: 'note'}, 'Total: ', h('b', null, eur2.format(cat.total)), '. Las devoluciones y los Bizum que te devuelven restan.'),
-      barList(cat.rows.map((x) => ({label: x.categoria, valor: x.importe, max: maxC, color: css('--c0'), valueText: eur2.format(x.importe), valueClass: x.importe < 0 ? 'ok' : ''})))));
+      h('h2', null, 'Dónde está tu dinero'),
+      hist.length ? h('p', {class: 'note'}, 'Última actualización: ' + fechaLarga(hist[hist.length - 1].fecha)) : null,
+      barList(saldosOrd.map((r) => ({label: r.cuenta, extra: r.entidad, valor: r.saldo, max: maxS, color: colGrupo[r.grupo] || css('--muted-bar'), valueText: eur2.format(r.saldo)})))));
   }
-
-  // Cartera
-  if (st.cartera.length) out.push(carteraCard(res));
 
   // Evolución
   out.push(h('section', {class: 'card'},
     h('h2', null, 'Evolución del patrimonio'),
-    h('p', {class: 'note'}, 'Un punto cada vez que guardas tus saldos.'),
+    h('p', {class: 'note'}, 'Un punto cada vez que guardas tus saldos o se actualizan los precios.'),
     hist.length ? chartEvolucion(hist) : emptyMsg('Aún no hay fotos de saldos.', '#saldos', 'Guardar saldos')));
 
   return out;
@@ -496,12 +456,12 @@ function carteraCard(res) {
     h('h2', null, 'Cartera por fondo'),
     h('p', {class: 'note'}, h('span', {class: 'dot', style: 'background:' + css('--c0')}), 'Renta variable ', h('b', null, pct0.format(res.pctVariable)), ' · ', h('span', {class: 'dot', style: 'background:' + css('--c3')}), 'renta fija ', h('b', null, pct0.format(res.pctFija)), '. Ganancia desde que compraste cada fondo.'),
     mix,
-    h('div', {class: 'tw'}, h('table', null,
-      h('thead', null, h('tr', null, h('th', null, 'Fondo'), h('th', null, 'Tipo'), h('th', null, 'Valor'), h('th', null, 'Ganancia'), h('th', null, 'Rentab.'))),
-      h('tbody', null, rows.map((x) => {
-        const g = x.valor - x.invertido, p = x.invertido ? g / x.invertido : 0, cls = g >= 0 ? 'ok' : 'bad';
-        return h('tr', null, h('td', null, x.fondo), h('td', null, x.tipo), h('td', null, eur2.format(x.valor)), h('td', {class: cls}, signed(g)), h('td', {class: cls}, (p >= 0 ? '+' : '') + pct1.format(p)));
-      })))));
+    h('ul', {class: 'lista fondos'}, rows.map((x) => {
+      const g = x.valor - x.invertido, p = x.invertido ? g / x.invertido : 0, cls = g >= 0 ? 'ok' : 'bad';
+      return h('li', null,
+        h('span', {class: 'lista-txt'}, h('span', {class: 'fondo-nombre'}, x.fondo), h('span', {class: 'e'}, x.tipo + (x.fecha_vl ? ' · precio del ' + fechaCorta(x.fecha_vl) : ''))),
+        h('span', {class: 'fondo-cifras'}, h('span', null, eur2.format(x.valor)), h('span', {class: 'e ' + cls}, signed(g) + ' · ' + (p >= 0 ? '+' : '') + pct1.format(p))));
+    })));
 }
 
 function chartEvolucion(hist) {
@@ -671,28 +631,86 @@ function tablaEditable(tabla, {orden, limite, cols} = {}) {
 
 /* ───────────────────────── Vistas de edición ───────────────────────── */
 
+/* ───────────────────────── Vista: Gastos (por meses) ───────────────────────── */
+
+let mesGastosSel = null;
+
+function mesesDisponibles() {
+  const set = new Set([hoy().slice(0, 7)]);
+  state.gastos.forEach((g) => g.fecha && set.add(String(g.fecha).slice(0, 7)));
+  state.presupuesto.forEach((p) => p.mes && set.add(p.mes));
+  return [...set].sort();
+}
+const mesLargo = (ym) => { const n = mesNombre(ym); return n.charAt(0).toUpperCase() + n.slice(1) + ' ' + ym.slice(0, 4); };
+
 function vistaGastos() {
-  const cols = SCHEMAS.gastos.cols;
-  const form = h('form', {class: 'form'},
-    datalists(),
-    h('div', {class: 'row'}, cols.map((c) => campo(c, c.k === 'fecha' ? hoy() : ''))),
-    h('div', {class: 'btns'}, h('button', {class: 'btn pri', type: 'submit'}, 'Apuntar gasto')));
-  form.addEventListener('submit', (ev) => {
-    ev.preventDefault();
-    if (!form.reportValidity()) return;
-    state.gastos.push({id: newId(), ...leerForm(form, cols)});
-    save();
-    toast('Gasto apuntado');
-    render();
-    const c = document.getElementById('f-concepto');
-    if (c) c.focus();
-  });
-  const mes = state.gastos.length ? calcGastosCat(state) : null;
-  return [
-    h('section', {class: 'card'}, h('h2', null, 'Apuntar un gasto'), h('p', {class: 'note'}, SCHEMAS.gastos.ayuda), form),
-    mes && mes.mes ? h('p', {class: 'intro'}, 'Gastado en ' + mesNombre(mes.mes) + ': ', h('b', null, eur2.format(mes.total)), '.') : null,
-    tablaEditable('gastos', {orden: (a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0), limite: 200})
-  ];
+  const st = state;
+  const meses = mesesDisponibles();
+  if (!mesGastosSel || !meses.includes(mesGastosSel)) mesGastosSel = hoy().slice(0, 7);
+  const sel = mesGastosSel;
+  const i = meses.indexOf(sel);
+  const ir = (m) => { mesGastosSel = m; render(); };
+  const gm = calcGastosMes(st, sel);
+  const delMes = st.gastos.filter((g) => String(g.fecha).slice(0, 7) === sel).sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
+  const out = [];
+
+  // Selector de mes + total
+  out.push(h('section', {class: 'card'},
+    h('div', {class: 'mes-nav'},
+      h('button', {class: 'icon-btn grande', type: 'button', 'aria-label': 'Mes anterior', disabled: i <= 0, onclick: () => ir(meses[i - 1])}, '‹'),
+      h('h2', null, mesLargo(sel)),
+      h('button', {class: 'icon-btn grande', type: 'button', 'aria-label': 'Mes siguiente', disabled: i >= meses.length - 1, onclick: () => ir(meses[i + 1])}, '›')),
+    h('div', {class: 'total-mes'},
+      h('span', {class: 'heroe-num'}, eur2.format(gm.gastado)),
+      h('span', {class: 'sub'}, gm.previsto ? 'gastado de ' + eur0.format(gm.previsto) + ' previstos' : 'gastado · ' + delMes.length + ' movimientos')),
+    gm.previsto ? h('span', {class: 'track'}, h('span', {class: 'fill', style: `width:${Math.min(100, Math.max(0, gm.gastado) / gm.previsto * 100)}%;background:${gm.gastado > gm.previsto ? css('--bad') : css('--accent')}`})) : null,
+    gm.previsto ? h('p', {class: 'sub'}, gm.gastado <= gm.previsto ? 'Te quedan ' + eur0.format(gm.previsto - gm.gastado) + ' este mes.' : h('span', {class: 'bad'}, 'Te has pasado ' + eur0.format(gm.gastado - gm.previsto) + '.')) : null,
+    h('div', {class: 'btns'},
+      h('button', {class: 'btn pri', type: 'button', onclick: () => editRow('gastos', null, {fecha: sel === hoy().slice(0, 7) ? hoy() : sel + '-01'})}, '+ Añadir gasto'),
+      h('a', {class: 'btn', href: '#presupuesto'}, 'Presupuesto'))));
+
+  // Por categoría
+  if (gm.rows.length) {
+    const max = Math.max(1, ...gm.rows.map((x) => Math.max(x.previsto, x.gastado)));
+    const rows = gm.rows.slice().sort((a, b) => b.gastado - a.gastado || b.previsto - a.previsto);
+    out.push(h('section', {class: 'card'},
+      h('h2', null, 'Por categoría'),
+      gm.previsto ? h('p', {class: 'note'}, 'La barra clara es lo previsto; la de color, lo gastado.') : null,
+      barList(rows.map((x) => ({
+        label: x.concepto, extra: x.pendiente ? 'sin cifra prevista' : null, extraClass: 'warn',
+        valor: x.gastado, max, color: x.previsto && x.gastado > x.previsto ? css('--bad') : css('--c0'),
+        fondo: x.previsto ? {valor: x.previsto, color: css('--muted-bar')} : null,
+        valueText: eur2.format(x.gastado) + (x.previsto ? ' de ' + eur0.format(x.previsto) : ''),
+        valueClass: x.gastado < 0 ? 'ok' : x.previsto > 0 && x.gastado > x.previsto ? 'bad' : ''
+      })))));
+  }
+
+  // Movimientos del mes
+  out.push(h('section', {class: 'card'},
+    h('h2', null, 'Movimientos'),
+    delMes.length
+      ? h('ul', {class: 'lista'}, delMes.map((g) => h('li', null,
+        h('button', {class: 'lista-btn', type: 'button', onclick: () => editRow('gastos', g.id)},
+          h('span', {class: 'lista-fecha'}, fechaCorta(g.fecha)),
+          h('span', {class: 'lista-txt'}, h('span', null, g.concepto), h('span', {class: 'e'}, g.categoria)),
+          h('span', {class: 'lista-imp ' + (g.importe < 0 ? 'ok' : '')}, eur2.format(g.importe))))))
+      : h('p', {class: 'empty'}, 'No hay gastos en ' + mesNombre(sel) + '. Pulsa «Añadir gasto».'),
+    delMes.length ? h('p', {class: 'note'}, 'Toca un gasto para cambiarlo o borrarlo. Las devoluciones y los Bizum que te devuelven van en negativo.') : null));
+
+  // Últimos meses
+  const ultimos = meses.filter((m) => m <= hoy().slice(0, 7)).slice(-6);
+  if (ultimos.length > 1) {
+    const totales = ultimos.map((m) => ({m, t: sum(st.gastos.filter((g) => String(g.fecha).slice(0, 7) === m), (g) => g.importe)}));
+    const max = Math.max(1, ...totales.map((x) => x.t));
+    out.push(h('section', {class: 'card'},
+      h('h2', null, 'Últimos meses'),
+      h('div', {class: 'columnas'}, totales.map((x) => h('button', {class: 'columna' + (x.m === sel ? ' activa' : ''), type: 'button', onclick: () => ir(x.m), 'aria-label': mesLargo(x.m) + ': ' + eur0.format(x.t)},
+        h('span', {class: 'col-num'}, eur0.format(x.t)),
+        h('span', {class: 'col-barra'}, h('span', {style: `height:${Math.max(2, Math.max(0, x.t) / max * 100)}%`})),
+        h('span', {class: 'col-mes'}, mesNombre(x.m).slice(0, 3))))),
+      h('p', {class: 'note'}, 'Toca un mes para verlo.')));
+  }
+  return out;
 }
 
 function vistaSaldos() {
@@ -717,27 +735,60 @@ function vistaSaldos() {
       state.saldos.length ? filas : h('p', {class: 'empty'}, 'Añade tus cuentas abajo.'),
       state.saldos.length ? h('div', {class: 'form', style: 'margin-top:8px'},
         h('label', {class: 'f', for: 'f-foto'}, 'Fecha de la foto', fecha),
-        h('div', {class: 'btns'}, h('button', {class: 'btn pri', type: 'button', onclick: guardar}, 'Guardar saldos'))) : null),
+        h('div', {class: 'btns'},
+          h('button', {class: 'btn pri', type: 'button', onclick: guardar}, 'Guardar saldos'),
+          h('a', {class: 'btn', href: '#historial'}, 'Historial'))) : null),
     tablaEditable('saldos')
   ];
 }
 
-function vistaCartera() {
-  const res = calcResumen(state);
-  return [
-    state.cartera.length ? h('section', {class: 'tiles'},
-      tile('Valor de los fondos', eur2.format(res.fondos)),
-      tile('Aportado', eur2.format(res.invertido)),
-      tile('Ganancia', h('span', {class: res.ganancia >= 0 ? 'ok' : 'bad'}, signed(res.ganancia)), (res.rentabilidad >= 0 ? '+' : '') + pct1.format(res.rentabilidad))) : null,
-    state.cartera.length ? carteraCard(res) : null,
-    h('section', {class: 'card'},
-      h('h2', null, 'Precios de los fondos'),
-      h('p', {class: 'note'}, 'Cada lunes GitHub busca el valor liquidativo de cada ISIN. Al abrir la app se recalcula el valor de cada fondo con tus participaciones, el saldo de la cartera y se añade un punto a la evolución.'),
-      h('p', {class: 'note'}, preciosEstado),
-      h('div', {class: 'btns'}, h('button', {class: 'btn', type: 'button', onclick: () => actualizarPrecios(true)}, 'Buscar precios ahora'))),
-    tablaEditable('cartera', {orden: (a, b) => b.valor - a.valor, cols: ['fondo', 'participaciones', 'fecha_vl', 'valor']}),
-    h('p', {class: 'note'}, 'Para que los precios se actualicen solos, cada fondo necesita su ISIN y sus participaciones.')
-  ];
+/* ───────────────────────── Vista: Inversión ───────────────────────── */
+
+function vistaInversion() {
+  const st = state;
+  const res = calcResumen(st);
+  const inv = st.saldos.filter((r) => r.grupo === 'Inversión');
+  const rem = st.saldos.filter((r) => r.grupo === 'Cuenta remunerada');
+  const nombreInv = (inv.find((r) => r.entidad) || {}).entidad || 'Cartera';
+  const nombreRem = (rem.find((r) => r.entidad) || {}).entidad || 'Cuenta remunerada';
+  const porInvertir = sum(inv.filter((r) => /por invertir/i.test(r.cuenta)), (r) => r.saldo);
+  const out = [];
+
+  // Cartera de fondos
+  out.push(h('h2', {class: 'seccion'}, nombreInv, h('span', null, ' · cartera de fondos')));
+  if (st.cartera.length) {
+    out.push(h('section', {class: 'heroe heroe-peq'},
+      h('span', {class: 'heroe-lbl'}, 'Valor de los fondos'),
+      h('span', {class: 'heroe-num'}, eur2.format(res.fondos)),
+      h('span', {class: 'heroe-sub'}, h('span', {class: res.ganancia >= 0 ? 'ok' : 'bad'}, signed(res.ganancia) + ' (' + (res.rentabilidad >= 0 ? '+' : '') + pct1.format(res.rentabilidad) + ')'), ' sobre ' + eur2.format(res.invertido) + ' aportados'),
+      porInvertir ? h('span', {class: 'heroe-sub'}, 'Además, ' + eur2.format(porInvertir) + ' por invertir') : null));
+    out.push(carteraCard(res));
+  }
+  out.push(h('section', {class: 'card'},
+    h('h2', null, 'Precios de los fondos'),
+    h('p', {class: 'note'}, 'Cada lunes se busca el valor liquidativo de cada ISIN. Al abrir la app se recalcula el valor de cada fondo con tus participaciones.'),
+    h('p', {class: 'note'}, preciosEstado),
+    h('div', {class: 'btns'}, h('button', {class: 'btn', type: 'button', onclick: () => actualizarPrecios(true)}, 'Buscar precios ahora'))));
+  out.push(tablaEditable('cartera', {orden: (a, b) => b.valor - a.valor, cols: ['fondo', 'participaciones', 'fecha_vl', 'valor']}));
+
+  // Cuenta remunerada
+  out.push(h('h2', {class: 'seccion'}, nombreRem, h('span', null, ' · cuenta remunerada')));
+  if (rem.length) {
+    const saldo = sum(rem, (r) => r.saldo);
+    const tae = st.config.interesTR;
+    const aportado = sum(st.movimientos.filter((m) => m.destino === DESTINOS[0]), (m) => m.importe);
+    out.push(h('section', {class: 'heroe heroe-peq'},
+      h('span', {class: 'heroe-lbl'}, 'Saldo'),
+      h('span', {class: 'heroe-num'}, eur2.format(saldo)),
+      tae > 0
+        ? h('span', {class: 'heroe-sub'}, 'Al ' + tae.toLocaleString('es-ES') + ' % TAE te da unos ', h('b', null, eur2.format(saldo * tae / 100 / 12)), ' al mes (' + eur0.format(saldo * tae / 100) + ' al año)')
+        : h('span', {class: 'heroe-sub'}, 'Pon el interés (TAE) en Ajustes para ver cuánto te da al mes.'),
+      aportado ? h('span', {class: 'heroe-sub'}, 'Transferencias apuntadas en la app: ' + eur2.format(aportado)) : null));
+    out.push(h('div', {class: 'btns'}, h('a', {class: 'btn', href: '#saldos'}, 'Actualizar saldo'), h('a', {class: 'btn', href: '#ajustes'}, 'Cambiar TAE')));
+  } else {
+    out.push(emptyMsg('No tienes ninguna cuenta del grupo «Cuenta remunerada».', '#saldos', 'Añadir cuenta'));
+  }
+  return out;
 }
 
 /* ───────────────────────── Precios automáticos ───────────────────────── */
@@ -813,19 +864,7 @@ async function actualizarPrecios(manual) {
   }
 }
 
-function vistaMas() {
-  const items = [
-    ['#nominas', 'Nóminas y transferencias', 'Lo que cobras y lo que mueves a ahorro e inversión'],
-    ['#presupuesto', 'Gastos previstos', 'Presupuesto por mes y categoría'],
-    ['#historial', 'Historial de saldos', 'Las fotos de la evolución del patrimonio'],
-    ['#ajustes', 'Reglas de reparto', 'Margen, porcentajes, colchón y cuota del coche'],
-    ['#datos', 'Copia de seguridad', 'Exportar, importar o borrar tus datos'],
-    ['#cuenta', 'Cuenta y seguridad', 'Sesión, contraseña y bloqueo con código']
-  ];
-  return [h('nav', {class: 'links'}, items.map(([href, t, d]) => h('a', {href}, t, h('span', null, d))))];
-}
-
-const volver = () => h('a', {class: 'back', href: '#mas'}, '← Más');
+const volver = () => h('a', {class: 'back', href: '#ajustes'}, '← Ajustes');
 
 function vistaNominas() {
   return [volver(),
@@ -833,14 +872,39 @@ function vistaNominas() {
     tablaEditable('movimientos', {orden: (a, b) => (a.fecha < b.fecha ? 1 : -1)})];
 }
 function vistaPresupuesto() {
-  return [volver(), tablaEditable('presupuesto', {orden: (a, b) => (a.mes < b.mes ? -1 : a.mes > b.mes ? 1 : 0)})];
+  return [h('a', {class: 'back', href: '#gastos'}, '← Gastos'), tablaEditable('presupuesto', {orden: (a, b) => (a.mes < b.mes ? -1 : a.mes > b.mes ? 1 : 0)})];
 }
 function vistaHistorial() {
-  return [volver(), tablaEditable('historial', {orden: (a, b) => (a.fecha < b.fecha ? 1 : -1)})];
+  return [h('a', {class: 'back', href: '#saldos'}, '← Saldos'), tablaEditable('historial', {orden: (a, b) => (a.fecha < b.fecha ? 1 : -1)})];
 }
+
+/* ───────────────────────── Tema (claro / oscuro) ───────────────────────── */
+
+const TEMA_KEY = 'patrimonio-tema';
+function temaActual() {
+  try { return localStorage.getItem(TEMA_KEY) || 'auto'; } catch (e) { return 'auto'; }
+}
+function aplicarTema(t) {
+  const raiz = document.documentElement;
+  if (t === 'claro' || t === 'oscuro') raiz.dataset.theme = t; else delete raiz.dataset.theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', css('--bg') || '#011811');
+}
+function cambiarTema(t) {
+  try { localStorage.setItem(TEMA_KEY, t); } catch (e) { /* sin almacenamiento */ }
+  aplicarTema(t);
+  render();
+}
+aplicarTema(temaActual());
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => aplicarTema(temaActual()));
+
+/* ───────────────────────── Vista: Ajustes ───────────────────────── */
 
 function vistaAjustes() {
   const c = state.config;
+  const tema = temaActual();
+  const opcion = (valor, texto) => h('button', {class: 'seg' + (tema === valor ? ' activo' : ''), type: 'button', 'aria-pressed': tema === valor ? 'true' : 'false', onclick: () => cambiarTema(valor)}, texto);
+
   const f = (k, l, attrs) => h('label', {class: 'f', for: 'c-' + k}, l, h('input', {id: 'c-' + k, name: k, value: String(c[k]), ...attrs}));
   const form = h('form', {class: 'form'},
     h('div', {class: 'row'},
@@ -848,10 +912,11 @@ function vistaAjustes() {
       f('margen', 'Margen en la cuenta corriente (€)', {type: 'number', step: '1', inputmode: 'decimal'}),
       h('label', {class: 'f', for: 'c-pctTR'}, '% de lo que sobra a la cuenta remunerada',
         h('input', {id: 'c-pctTR', name: 'pctTR', type: 'number', step: '1', min: '0', max: '100', value: String(Math.round(c.pctTR * 100))})),
+      f('interesTR', 'Interés de la cuenta remunerada (% TAE)', {type: 'number', step: '0.01', min: '0', inputmode: 'decimal'}),
       f('mesesColchon', 'Meses de colchón objetivo', {type: 'number', step: '1', min: '0'}),
       f('cuotaCoche', 'Cuota mensual del coche (€, 0 = ninguna)', {type: 'number', step: '0.01', inputmode: 'decimal'})),
     h('label', {class: 'chk'}, h('input', {type: 'checkbox', name: 'preciosAuto', checked: c.preciosAuto}), 'Actualizar los precios de los fondos al abrir la app'),
-    h('div', {class: 'btns'}, h('button', {class: 'btn pri', type: 'submit'}, 'Guardar reglas')));
+    h('div', {class: 'btns'}, h('button', {class: 'btn pri', type: 'submit'}, 'Guardar')));
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const e = form.elements;
@@ -860,15 +925,34 @@ function vistaAjustes() {
       nombre: e.nombre.value.trim(),
       margen: Number(e.margen.value) || 0,
       pctTR: Math.min(100, Math.max(0, Number(e.pctTR.value) || 0)) / 100,
+      interesTR: Math.max(0, Number(String(e.interesTR.value).replace(',', '.')) || 0),
       mesesColchon: Number(e.mesesColchon.value) || 0,
       cuotaCoche: Number(e.cuotaCoche.value) || 0,
       preciosAuto: e.preciosAuto.checked
     };
     save();
     render();
-    toast('Reglas guardadas');
+    toast('Ajustes guardados');
   });
-  return [volver(), h('section', {class: 'card'}, h('h2', null, 'Reglas de reparto'), h('p', {class: 'note'}, 'Con la última nómina: en la cuenta corriente se quedan los gastos previstos del mes siguiente más el margen; lo que sobra se reparte entre la cuenta remunerada y la cartera, en decenas.'), form)];
+
+  const enlaces = [
+    ['#cuenta', 'Cuenta y seguridad', 'Sesión, contraseña y bloqueo con código'],
+    ['#nominas', 'Nóminas y transferencias', 'Lo que cobras y lo que mueves a ahorro e inversión'],
+    ['#presupuesto', 'Presupuesto', 'Gastos previstos por mes y categoría'],
+    ['#historial', 'Historial de saldos', 'Las fotos de la evolución del patrimonio'],
+    ['#datos', 'Copia de seguridad', 'Exportar, importar o borrar tus datos']
+  ];
+  return [
+    h('section', {class: 'card'},
+      h('h2', null, 'Apariencia'),
+      h('p', {class: 'note'}, 'En «Automático» sigue el modo claro u oscuro del móvil.'),
+      h('div', {class: 'segmentos', role: 'group', 'aria-label': 'Tema'}, opcion('auto', 'Automático'), opcion('claro', 'Claro'), opcion('oscuro', 'Oscuro'))),
+    h('section', {class: 'card'},
+      h('h2', null, 'Reglas y preferencias'),
+      h('p', {class: 'note'}, 'Con la última nómina: en la cuenta corriente se quedan los gastos previstos del mes siguiente más el margen; lo que sobra se reparte entre la cuenta remunerada y la cartera, en decenas.'),
+      form),
+    h('nav', {class: 'links'}, enlaces.map(([href, t, d]) => h('a', {href}, t, h('span', null, d))))
+  ];
 }
 
 function vistaDatos() {
@@ -922,15 +1006,17 @@ function vistaDatos() {
 const VISTAS = {
   panel: [vistaPanel, 'panel'],
   gastos: [vistaGastos, 'gastos'],
+  inversion: [vistaInversion, 'inversion'],
   saldos: [vistaSaldos, 'saldos'],
-  cartera: [vistaCartera, 'cartera'],
-  mas: [vistaMas, 'mas'],
-  nominas: [vistaNominas, 'mas'],
-  presupuesto: [vistaPresupuesto, 'mas'],
-  historial: [vistaHistorial, 'mas'],
-  ajustes: [vistaAjustes, 'mas'],
-  datos: [vistaDatos, 'mas'],
-  cuenta: [() => vistaCuenta(), 'mas']
+  ajustes: [vistaAjustes, 'ajustes'],
+  nominas: [vistaNominas, 'ajustes'],
+  presupuesto: [vistaPresupuesto, 'gastos'],
+  historial: [vistaHistorial, 'saldos'],
+  datos: [vistaDatos, 'ajustes'],
+  cuenta: [() => vistaCuenta(), 'ajustes'],
+  // direcciones antiguas
+  cartera: [vistaInversion, 'inversion'],
+  mas: [vistaAjustes, 'ajustes']
 };
 
 let ultimaVista = null;
