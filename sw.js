@@ -1,7 +1,7 @@
 /* Service worker: guarda la app para que funcione sin conexión.
  * Sube el número de versión cuando cambies algún archivo para que el móvil descargue la nueva. */
-const CACHE = 'patrimonio-v5';
-const ARCHIVOS = ['./', './index.html', './styles.css', './app.js', './cuenta.js', './config.js', './vendor/supabase.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './favicon-32.png'];
+const CACHE = 'patrimonio-v6';
+const ARCHIVOS = ['./', './index.html', './styles.css', './app.js', './ui.js', './cuenta.js', './config.js', './vendor/supabase.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './favicon-32.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));

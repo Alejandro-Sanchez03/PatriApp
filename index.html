@@ -5,30 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>PatriApp</title>
   <meta name="description" content="Seguimiento de patrimonio, gastos, nómina y cartera indexada. Los datos se guardan solo en tu dispositivo.">
-  <meta name="theme-color" content="#011811">
+  <meta name="theme-color" content="#06110d">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PatriApp">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="favicon-32.png" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <script>try{var t=localStorage.getItem('patrimonio-tema');if(t==='claro'||t==='oscuro')document.documentElement.dataset.theme=t}catch(e){}</script>
+  <script>try{var t=localStorage.getItem('patrimonio-tema');t=t||'oscuro';if(t==='claro'||t==='oscuro')document.documentElement.dataset.theme=t}catch(e){}</script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar">
     <h1 id="titulo">PatriApp</h1>
-    <span id="estado-nube" class="estado" aria-live="polite"></span>
+    <div class="topbar-der">
+      <span id="estado-nube" class="estado" aria-live="polite"></span>
+      <a href="#ajustes" id="avatar" class="avatar-usuario" aria-label="Ajustes y cuenta">P</a>
+    </div>
   </header>
 
   <main id="vista" class="vista" tabindex="-1"></main>
 
+  <button id="fab" class="fab" type="button" aria-label="Añadir gasto" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+
   <nav class="tabs" aria-label="Secciones">
-    <a href="#panel" data-tab="panel"><span class="ico" aria-hidden="true">⌂</span>Inicio</a>
-    <a href="#gastos" data-tab="gastos"><span class="ico" aria-hidden="true">−</span>Gastos</a>
-    <a href="#inversion" data-tab="inversion"><span class="ico" aria-hidden="true">↗</span>Inversión</a>
-    <a href="#saldos" data-tab="saldos"><span class="ico" aria-hidden="true">€</span>Saldos</a>
-    <a href="#ajustes" data-tab="ajustes"><span class="ico" aria-hidden="true">⚙</span>Ajustes</a>
+    <a href="#panel" data-tab="panel"><span class="ico" data-ico="inicio"></span>Inicio</a>
+    <a href="#gastos" data-tab="gastos"><span class="ico" data-ico="gastos"></span>Gastos</a>
+    <a href="#inversion" data-tab="inversion"><span class="ico" data-ico="inversion"></span>Inversión</a>
+    <a href="#saldos" data-tab="saldos"><span class="ico" data-ico="saldos"></span>Saldos</a>
+    <a href="#ajustes" data-tab="ajustes"><span class="ico" data-ico="ajustes"></span>Ajustes</a>
   </nav>
 
   <dialog id="dialogo">
@@ -40,6 +45,7 @@
   <script src="config.js"></script>
   <script src="vendor/supabase.js"></script>
   <script src="app.js"></script>
+  <script src="ui.js"></script>
   <script src="cuenta.js"></script>
 </body>
 </html>

@@ -209,7 +209,7 @@ function pantallaBloqueo(alAbrir, aviso) {
     setTimeout(() => { const i = document.querySelector('input.pin'); if (i) i.focus(); }, 50);
     return tarjeta('App bloqueada', aviso || {texto: usuario ? usuario.email : ''}, form,
       h('div', {class: 'acceso-enlaces'}, enlace('He olvidado el código', async () => {
-        if (!confirm('Se cerrará la sesión y tendrás que entrar con tu contraseña. ¿Seguir?')) return;
+        if (!(await confirmar('Se cerrará la sesión y tendrás que entrar con tu contraseña.', {titulo: '¿Has olvidado el código?', aceptar: 'Cerrar sesión'}))) return;
         await cerrarSesion({sinPreguntar: true});
         mostrar(pantallaLogin());
       })));
@@ -248,14 +248,15 @@ function pintarEstado() {
   const el = document.getElementById('estado-nube');
   if (!el) return;
   const textos = {
-    local: ['Solo en este dispositivo', ''],
-    ok: ['Guardado', 'ok'],
-    guardando: ['Guardando…', ''],
-    offline: ['Sin conexión: se guardará al volver', 'warn'],
-    error: ['No se pudo guardar', 'bad']
+    local: ['', 'Datos guardados solo en este dispositivo', 'local'],
+    ok: ['', 'Guardado en tu cuenta', 'ok'],
+    guardando: ['Guardando…', 'Guardando en tu cuenta', 'guardando'],
+    offline: ['Sin conexión', 'Sin conexión: se guardará al volver', 'warn'],
+    error: ['Error al guardar', 'No se pudo guardar', 'bad']
   };
-  const [t, c] = textos[nube.estado] || textos.ok;
+  const [t, titulo, c] = textos[nube.estado] || textos.ok;
   el.textContent = window.pantallaCuenta ? '' : t;
+  el.title = titulo;
   el.className = 'estado ' + c;
 }
 
@@ -306,7 +307,7 @@ async function sincronizar() {
   if (!data) return null; // todavía no hay fila en la nube
   const remotoMasNuevo = !nube.actualizado || new Date(data.actualizado) > new Date(nube.actualizado);
   if (remotoMasNuevo && nube.pendiente) {
-    const usarNube = confirm('Tus datos han cambiado en otro dispositivo y aquí también hay cambios sin subir.\n\nAceptar: quedarte con los de la nube.\nCancelar: quedarte con los de este dispositivo.');
+    const usarNube = await confirmar('Tus datos han cambiado en otro dispositivo y aquí también hay cambios sin subir.', {titulo: '¿Qué datos quieres conservar?', aceptar: 'Los de la nube', cancelar: 'Los de este dispositivo'});
     if (!usarNube) { await subir(); return true; }
   }
   if (remotoMasNuevo) {
@@ -385,7 +386,7 @@ function tareasTrasCargar() {
 }
 
 async function cerrarSesion({sinPreguntar} = {}) {
-  if (!sinPreguntar && !confirm('¿Cerrar sesión en este dispositivo?')) return false;
+  if (!sinPreguntar && !(await confirmar('Tendrás que volver a entrar con tu email y contraseña.', {titulo: '¿Cerrar sesión?', aceptar: 'Cerrar sesión', peligro: true}))) return false;
   if (nube.pendiente) { try { await subir(); } catch (e) { /* se intentó */ } }
   if (usuario) ls.del(claveCache());
   ls.del(PIN_KEY); ls.del(PIN_FALLOS);
@@ -400,7 +401,7 @@ async function cerrarSesion({sinPreguntar} = {}) {
 /* ───────────────────────── Vista: Cuenta y seguridad ───────────────────────── */
 
 function vistaCuenta() {
-  const volverMas = h('a', {class: 'back', href: '#ajustes'}, '← Ajustes');
+  const volverMas = volver();
   if (!CONFIGURADO) {
     return [volverMas, h('section', {class: 'card'},
       h('h2', null, 'Cuenta'),
@@ -443,8 +444,8 @@ function vistaCuenta() {
         : 'Pide un código de 4 a 6 cifras al abrir la app, aunque la sesión siga iniciada.'),
       h('div', {class: 'btns'},
         h('button', {class: 'btn' + (pin ? '' : ' pri'), type: 'button', onclick: () => mostrar(pantallaCrearPin())}, pin ? 'Cambiar código' : 'Activar código'),
-        pin ? h('button', {class: 'btn dan', type: 'button', onclick: () => {
-          if (!confirm('¿Quitar el bloqueo con código en este dispositivo?')) return;
+        pin ? h('button', {class: 'btn dan', type: 'button', onclick: async () => {
+          if (!(await confirmar('Ya no se pedirá el código al abrir la app en este dispositivo.', {titulo: '¿Quitar el código?', aceptar: 'Quitar', peligro: true}))) return;
           ls.del(PIN_KEY); render(); toast('Código quitado');
         }}, 'Quitar código') : null))];
 }
