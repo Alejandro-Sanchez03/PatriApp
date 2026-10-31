@@ -1,0 +1,70 @@
+{
+  "actualizado": "2026-10-31T17:52:10+00:00",
+  "fondos": {
+    "IE00BYX5MX67": {
+      "vl": 16.8,
+      "moneda": "EUR",
+      "fecha": "2026-10-30",
+      "fuente": "Financial Times",
+      "vl_eur": 16.8
+    },
+    "LU2349459045": {
+      "vl": 7963.15,
+      "moneda": "EUR",
+      "fecha": "2026-10-30",
+      "fuente": "Financial Times",
+      "vl_eur": 7963.15
+    },
+    "IE0007471471": {
+      "vl": 88.52,
+      "moneda": "EUR",
+      "fecha": "2026-10-30",
+      "fuente": "Financial Times",
+      "vl_eur": 88.52
+    },
+    "IE00BYWYCC39": {
+      "vl": 19.28,
+      "moneda": "EUR",
+      "fecha": "2026-10-29",
+      "fuente": "Financial Times",
+      "vl_eur": 19.28
+    },
+    "IE00B246KL88": {
+      "vl": 126.26,
+      "moneda": "EUR",
+      "fecha": "2026-10-30",
+      "fuente": "Financial Times",
+      "vl_eur": 126.26
+    },
+    "IE00BYX5N771": {
+      "vl": 10.53,
+      "moneda": "EUR",
+      "fecha": "2026-10-30",
+      "fuente": "Financial Times",
+      "vl_eur": 10.53
+    },
+    "IE00BYX5MD61": {
+      "vl": 10.9,
+      "moneda": "EUR",
+      "fecha": "2026-10-30",
+      "fuente": "Financial Times",
+      "vl_eur": 10.9
+    },
+    "IE00B1G3DH73": {
+      "vl": 51.87,
+      "moneda": "EUR",
+      "fecha": "2026-10-30",
+      "fuente": "Financial Times",
+      "vl_eur": 51.87
+    },
+    "IE00BDZVHT63": {
+      "vl": 8.44,
+      "moneda": "USD",
+      "fecha": "2026-10-30",
+      "fuente": "Financial Times",
+      "vl_eur": 7.55456,
+      "cambio_usd_eur": 0.89509
+    }
+  },
+  "errores": []
+}
