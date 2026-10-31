@@ -444,6 +444,7 @@ async function cargarDatos() {
 }
 
 function tareasTrasCargar() {
+  mostrarTutorial(false);
   const n = aplicarRecurrentes();
   if (n) { save(); render(); toast(n === 1 ? 'Se ha apuntado 1 gasto recurrente' : 'Se han apuntado ' + n + ' gastos recurrentes'); }
   guardarCopiaLocal();

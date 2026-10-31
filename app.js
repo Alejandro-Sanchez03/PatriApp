@@ -1051,6 +1051,11 @@ function vistaAjustes() {
       filaAjuste('#importar', 'banco', '#7aa2ff', 'Importar del banco', 'Excel o CSV de BBVA u otro banco'),
       filaAjuste('#versiones', 'reloj', '#fbbf24', 'Historial de versiones', 'Vuelve atrás si algo sale mal'),
       filaAjuste('#datos', 'copia', '#94a3b8', 'Copia de seguridad', 'Exportar, importar o borrar')),
+    h('h3', {class: 'grupo-tit'}, 'Ayuda'),
+    h('ul', {class: 'grupo'}, h('li', null, h('button', {class: 'fila', type: 'button', onclick: () => mostrarTutorial(true)},
+      h('span', {class: 'avatar sm', style: '--c:#f472b6'}, icono('luna')),
+      h('span', {class: 'fila-txt'}, h('span', null, 'Ver el tutorial'), h('span', {class: 'e'}, 'Lo que puedes hacer con PatriApp')),
+      icono('chevron', 'chev')))),
     h('p', {class: 'pie'}, 'PatriApp')
   ];
 }

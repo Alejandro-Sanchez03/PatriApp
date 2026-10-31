@@ -415,3 +415,29 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 .bienv-cuenta { display: grid; gap: 8px; padding: 12px 0; }
 .bienv-cuenta .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .bienv-cuenta .input-euro input[type=number] { width: 7.5rem; }
+
+/* ── Tutorial ── */
+.tutorial {
+  position: fixed; inset: 0; z-index: 40; display: grid; grid-template-rows: auto 1fr auto;
+  background: radial-gradient(120% 70% at 50% 0%, var(--bg-2), var(--bg) 70%), var(--bg);
+  padding: calc(14px + env(safe-area-inset-top)) 0 calc(18px + env(safe-area-inset-bottom));
+  animation: fundido .3s ease;
+}
+.tutorial.saliendo { opacity: 0; transition: opacity .25s; }
+.tut-cab { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+.tut-cab img { border-radius: 9px; }
+.tut-pista { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tut-pista::-webkit-scrollbar { display: none; }
+.tut-paso { scroll-snap-align: center; display: grid; align-content: center; justify-items: center; text-align: center; gap: 14px; padding: 0 32px; }
+.tut-paso h2 { margin: 18px 0 0; font-size: 1.7rem; font-weight: 750; letter-spacing: -.02em; max-width: 20ch; }
+.tut-paso p { margin: 0; color: var(--muted); font-size: 1.02rem; line-height: 1.5; max-width: 32ch; }
+.tut-dibujo { --c: var(--accent); position: relative; width: 170px; height: 170px; display: grid; place-items: center; }
+.tut-aro { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--c) 30%, transparent), transparent 68%); animation: latir 3s ease-in-out infinite; }
+.tut-icono { position: relative; width: 104px; height: 104px; border-radius: 32px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 18%, var(--panel)); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); box-shadow: 0 16px 40px color-mix(in srgb, var(--c) 25%, transparent); }
+.tut-icono .ico-svg { width: 52px; height: 52px; stroke-width: 1.6; }
+@keyframes latir { 50% { transform: scale(1.08); opacity: .75; } }
+.tut-pie { display: grid; gap: 18px; padding: 0 24px; max-width: 480px; width: 100%; margin: 0 auto; }
+.tut-puntos { display: flex; justify-content: center; gap: 7px; }
+.tut-puntos span { width: 7px; height: 7px; border-radius: 99px; background: var(--muted-bar); transition: width .25s, background .25s; }
+.tut-puntos span.activo { width: 22px; background: var(--accent); }
+.tut-saltar { color: var(--muted) !important; font-weight: 500 !important; }

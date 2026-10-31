@@ -306,3 +306,57 @@ function vistaVersiones() {
       : h('p', {class: 'empty'}, 'Se guarda una copia al día de los últimos 7 días.')));
   return out;
 }
+
+/* ───────────────────────── Tutorial de la primera vez ───────────────────────── */
+
+const TUTORIAL_KEY = 'patrimonio-tutorial-visto';
+const PASOS_TUTORIAL = [
+  ['inversion', '#76e78e', 'Bienvenido a PatriApp', 'Todo tu dinero en un vistazo: tu patrimonio neto en grande y cómo evoluciona. Desliza el dedo por el gráfico para ver cada fecha.'],
+  ['gastos', '#f472b6', 'Apunta tus gastos en un toque', 'Pulsa el botón verde + para añadir un gasto, o importa el Excel de tu banco desde Gastos: la app pone la categoría sola.'],
+  ['repetir', '#22d3ee', 'Los fijos se apuntan solos', 'Alquiler, suscripciones, academia… Añádelos en Gastos → Fijos y cada mes aparecerán sin que hagas nada.'],
+  ['hucha', '#fbbf24', 'Tu nómina, bien repartida', 'Cuando cobras, la app te dice cuánto dejar para tus gastos y cuánto mover a ahorro e inversión. Al apuntar la transferencia, el dinero se mueve solo entre tus cuentas.'],
+  ['banco', '#7aa2ff', 'Tu cartera, siempre al día', 'Cada lunes se buscan los precios de tus fondos. Cuando quieras, ajústala con los datos reales de tu banco en Inversión.'],
+  ['escudo', '#a78bfa', 'Tus datos, seguros', 'Solo tú ves tus datos. Activa Face ID en Ajustes, y si algo sale mal, vuelve atrás desde el Historial de versiones.']
+];
+
+function tutorialVisto() {
+  try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch (e) { return true; }
+}
+function mostrarTutorial(forzar) {
+  if (!forzar && tutorialVisto()) return;
+  if (document.getElementById('tutorial')) return;
+  const cerrar = () => {
+    try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch (e) { /* nada */ }
+    capa.classList.add('saliendo');
+    setTimeout(() => capa.remove(), 250);
+    document.body.style.overflow = '';
+  };
+  const pista = h('div', {class: 'tut-pista'}, PASOS_TUTORIAL.map(([ico, color, titulo, texto]) => h('section', {class: 'tut-paso'},
+    h('div', {class: 'tut-dibujo', style: '--c:' + color}, h('span', {class: 'tut-aro'}), h('span', {class: 'tut-icono'}, icono(ico))),
+    h('h2', null, titulo),
+    h('p', null, texto))));
+  const puntos = h('div', {class: 'tut-puntos'}, PASOS_TUTORIAL.map((_, i) => h('span', {class: i === 0 ? 'activo' : ''})));
+  const siguiente = h('button', {class: 'btn pri ancho', type: 'button'}, 'Siguiente');
+  const saltar = h('button', {class: 'btn-txt tut-saltar', type: 'button', onclick: cerrar}, 'Saltar');
+  const actual = () => Math.round(pista.scrollLeft / Math.max(1, pista.clientWidth));
+  const pintar = () => {
+    const i = actual();
+    [...puntos.children].forEach((p, j) => p.classList.toggle('activo', j === i));
+    const ultimo = i >= PASOS_TUTORIAL.length - 1;
+    siguiente.textContent = ultimo ? 'Empezar' : 'Siguiente';
+    saltar.style.visibility = ultimo ? 'hidden' : 'visible';
+  };
+  pista.addEventListener('scroll', () => requestAnimationFrame(pintar), {passive: true});
+  siguiente.addEventListener('click', () => {
+    const i = actual();
+    if (i >= PASOS_TUTORIAL.length - 1) return cerrar();
+    pista.scrollTo({left: (i + 1) * pista.clientWidth, behavior: 'smooth'});
+  });
+  const capa = h('div', {id: 'tutorial', class: 'tutorial', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Tutorial de PatriApp'},
+    h('div', {class: 'tut-cab'}, h('img', {src: 'icon-192.png', alt: '', width: '34', height: '34'}), saltar),
+    pista,
+    h('div', {class: 'tut-pie'}, puntos, siguiente));
+  document.body.append(capa);
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => siguiente.focus(), 50);
+}
