@@ -1,0 +1,17 @@
+{
+  "name": "Mi Patrimonio",
+  "short_name": "Patrimonio",
+  "description": "Seguimiento de patrimonio, gastos, nómina y cartera indexada.",
+  "lang": "es",
+  "start_url": "./index.html#panel",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#1f6f5c",
+  "icons": [
+    {"src": "icon-192.png", "type": "image/png", "sizes": "192x192"},
+    {"src": "icon-512.png", "type": "image/png", "sizes": "512x512"},
+    {"src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable"},
+    {"src": "icon.svg", "type": "image/svg+xml", "sizes": "any"}
+  ]
+}

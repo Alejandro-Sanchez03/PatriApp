@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mi Patrimonio</title>
+  <meta name="description" content="Seguimiento de patrimonio, gastos, nómina y cartera indexada. Los datos se guardan solo en tu dispositivo.">
+  <meta name="theme-color" content="#1f6f5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Patrimonio">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="titulo">Mi Patrimonio</h1>
+  </header>
+
+  <main id="vista" class="vista" tabindex="-1"></main>
+
+  <nav class="tabs" aria-label="Secciones">
+    <a href="#panel" data-tab="panel"><span class="ico" aria-hidden="true">◎</span>Panel</a>
+    <a href="#gastos" data-tab="gastos"><span class="ico" aria-hidden="true">−</span>Gastos</a>
+    <a href="#saldos" data-tab="saldos"><span class="ico" aria-hidden="true">€</span>Saldos</a>
+    <a href="#cartera" data-tab="cartera"><span class="ico" aria-hidden="true">↗</span>Cartera</a>
+    <a href="#mas" data-tab="mas"><span class="ico" aria-hidden="true">≡</span>Más</a>
+  </nav>
+
+  <dialog id="dialogo">
+    <form method="dialog" id="dialogo-form"></form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
