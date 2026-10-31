@@ -24,6 +24,8 @@ App web instalable (PWA) para seguir el patrimonio: saldos por cuenta, gastos, n
 
 **Actualización 8 (una vez):** en **SQL Editor → New query**, pega `supabase/actualizacion-v8.sql` y pulsa **Run**. Activa el historial de versiones en la nube, el botón «Eliminar mi cuenta» y la lista de ISIN (sin importes) para que la búsqueda de precios de los lunes encuentre también los fondos de los demás usuarios.
 
+**Actualización 9 (una vez):** ejecuta igual `supabase/actualizacion-v9.sql`. Activa los **pagos con Apple Pay**: en la app, **Ajustes → Pagos con Apple Pay → Activar** y sigue los pasos para crear la automatización «Transacción» en la app Atajos del iPhone. Cada pago con Apple Pay se apunta solo, con su categoría.
+
 **Para las demás personas:** que creen su cuenta desde la app. Cuando estéis todos, cierra el registro en **Authentication → Sign In / Providers → Allow new users to sign up** (desactivado) y pon `registroAbierto: false` en `config.js`. Para añadir a alguien después: **Authentication → Users → Invite user** (recibirá un email para elegir contraseña).
 
 **A tener en cuenta del plan gratis:** Supabase pausa los proyectos sin uso durante 7 días seguidos; si pasa, entra en supabase.com y pulsa **Restore**. Los emails (confirmación, recuperar contraseña) tienen un límite de unos pocos por hora.

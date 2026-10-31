@@ -310,9 +310,11 @@ function vistaVersiones() {
 /* ───────────────────────── Tutorial de la primera vez ───────────────────────── */
 
 const TUTORIAL_KEY = 'patrimonio-tutorial-visto';
+const TUTORIAL_VERSION = '2';   // sube al añadir pasos: quien ya lo vio solo verá las novedades
 const PASOS_TUTORIAL = [
   ['inversion', '#76e78e', 'Bienvenido a PatriApp', 'Todo tu dinero en un vistazo: tu patrimonio neto en grande y cómo evoluciona. Desliza el dedo por el gráfico para ver cada fecha.'],
   ['gastos', '#f472b6', 'Apunta tus gastos en un toque', 'Pulsa el botón verde + para añadir un gasto, o importa el Excel de tu banco desde Gastos: la app pone la categoría sola.'],
+  ['billete', '#f5f5f7', 'Paga con el móvil y se apunta solo', 'Con Apple Pay, cada pago que hagas con el iPhone o el Apple Watch puede apuntarse automáticamente en PatriApp, con su categoría.', 'Está desactivado: actívalo en Ajustes → Pagos con Apple Pay.'],
   ['repetir', '#22d3ee', 'Los fijos se apuntan solos', 'Alquiler, suscripciones, academia… Añádelos en Gastos → Fijos y cada mes aparecerán sin que hagas nada.'],
   ['hucha', '#fbbf24', 'Tu nómina, bien repartida', 'Cuando cobras, la app te dice cuánto dejar para tus gastos y cuánto mover a ahorro e inversión. Al apuntar la transferencia, el dinero se mueve solo entre tus cuentas.'],
   ['banco', '#7aa2ff', 'Tu cartera, siempre al día', 'Cada lunes se buscan los precios de tus fondos. Cuando quieras, ajústala con los datos reales de tu banco en Inversión.'],
@@ -320,36 +322,43 @@ const PASOS_TUTORIAL = [
 ];
 
 function tutorialVisto() {
-  try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch (e) { return true; }
+  try { return localStorage.getItem(TUTORIAL_KEY); } catch (e) { return TUTORIAL_VERSION; }
 }
+/* Pasos nuevos en cada versión del tutorial (para quien ya vio la anterior). */
+const NOVEDADES_TUTORIAL = {'1': ['Paga con el móvil y se apunta solo']};
 function mostrarTutorial(forzar) {
-  if (!forzar && tutorialVisto()) return;
+  const visto = tutorialVisto();
+  if (!forzar && visto === TUTORIAL_VERSION) return;
   if (document.getElementById('tutorial')) return;
+  const novedades = !forzar && visto && NOVEDADES_TUTORIAL[visto];
+  const pasos = novedades ? PASOS_TUTORIAL.filter((p) => novedades.includes(p[2])) : PASOS_TUTORIAL;
   const cerrar = () => {
-    try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch (e) { /* nada */ }
+    try { localStorage.setItem(TUTORIAL_KEY, TUTORIAL_VERSION); } catch (e) { /* nada */ }
     capa.classList.add('saliendo');
     setTimeout(() => capa.remove(), 250);
     document.body.style.overflow = '';
   };
-  const pista = h('div', {class: 'tut-pista'}, PASOS_TUTORIAL.map(([ico, color, titulo, texto]) => h('section', {class: 'tut-paso'},
+  const pista = h('div', {class: 'tut-pista'}, pasos.map(([ico, color, titulo, texto, caja]) => h('section', {class: 'tut-paso'},
+    novedades ? h('span', {class: 'pill pill-ok'}, 'Novedad') : null,
     h('div', {class: 'tut-dibujo', style: '--c:' + color}, h('span', {class: 'tut-aro'}), h('span', {class: 'tut-icono'}, icono(ico))),
     h('h2', null, titulo),
-    h('p', null, texto))));
-  const puntos = h('div', {class: 'tut-puntos'}, PASOS_TUTORIAL.map((_, i) => h('span', {class: i === 0 ? 'activo' : ''})));
+    h('p', null, texto),
+    caja ? h('div', {class: 'tut-caja'}, icono('ajustes'), h('span', null, caja)) : null)));
+  const puntos = h('div', {class: 'tut-puntos', hidden: pasos.length < 2}, pasos.map((_, i) => h('span', {class: i === 0 ? 'activo' : ''})));
   const siguiente = h('button', {class: 'btn pri ancho', type: 'button'}, 'Siguiente');
   const saltar = h('button', {class: 'btn-txt tut-saltar', type: 'button', onclick: cerrar}, 'Saltar');
   const actual = () => Math.round(pista.scrollLeft / Math.max(1, pista.clientWidth));
   const pintar = () => {
     const i = actual();
     [...puntos.children].forEach((p, j) => p.classList.toggle('activo', j === i));
-    const ultimo = i >= PASOS_TUTORIAL.length - 1;
-    siguiente.textContent = ultimo ? 'Empezar' : 'Siguiente';
+    const ultimo = i >= pasos.length - 1;
+    siguiente.textContent = ultimo ? (novedades ? 'Entendido' : 'Empezar') : 'Siguiente';
     saltar.style.visibility = ultimo ? 'hidden' : 'visible';
   };
   pista.addEventListener('scroll', () => requestAnimationFrame(pintar), {passive: true});
   siguiente.addEventListener('click', () => {
     const i = actual();
-    if (i >= PASOS_TUTORIAL.length - 1) return cerrar();
+    if (i >= pasos.length - 1) return cerrar();
     pista.scrollTo({left: (i + 1) * pista.clientWidth, behavior: 'smooth'});
   });
   const capa = h('div', {id: 'tutorial', class: 'tutorial', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Tutorial de PatriApp'},
@@ -358,5 +367,149 @@ function mostrarTutorial(forzar) {
     h('div', {class: 'tut-pie'}, puntos, siguiente));
   document.body.append(capa);
   document.body.style.overflow = 'hidden';
+  pintar();
   setTimeout(() => siguiente.focus(), 50);
+}
+
+/* ───────────────────────── Pagos con Apple Pay (Atajos del iPhone) ───────────────────────── */
+
+const ATAJO_KEY = 'patrimonio-atajo';   // código del atajo guardado en este dispositivo para poder volver a copiarlo
+const nubeActiva = () => typeof CONFIGURADO !== 'undefined' && CONFIGURADO && usuario;
+const urlAtajo = () => String((window.PATRIMONIO_CONFIG || {}).supabaseUrl || '').replace(/\/$/, '') + '/rest/v1/rpc/apuntar_pago';
+const claveAtajo = () => String((window.PATRIMONIO_CONFIG || {}).supabaseAnonKey || '');
+
+function codigoAtajo() {
+  try { const c = JSON.parse(localStorage.getItem(ATAJO_KEY)); return c && usuario && c.uid === usuario.id ? c.token : null; } catch (e) { return null; }
+}
+
+/* Recoge los pagos que ha enviado el atajo y los apunta como gastos. */
+let recogiendoPagos = false;
+async function recogerPagos() {
+  if (!state.config.applePay || !nubeActiva() || recogiendoPagos) return 0;
+  recogiendoPagos = true;
+  try {
+    const {data, error} = await sb.from('pagos_pendientes').select('id, importe_texto, comercio, tarjeta, creado').eq('user_id', usuario.id).order('creado', {ascending: true}).limit(200);
+    if (error || !data || !data.length) return 0;
+    const hechos = new Set(state.config.pagosProcesados || []);
+    const mapa = aprenderCategorias();
+    let n = 0, prueba = false;
+    for (const p of data) {
+      if (hechos.has(p.id)) continue;
+      hechos.add(p.id);
+      if (p.comercio === 'PRUEBA PATRIAPP') { prueba = true; continue; }
+      const importe = Math.abs(leerImporte(p.importe_texto));
+      if (!(importe > 0)) continue;
+      const fecha = new Date(p.creado);
+      const concepto = (p.comercio || '').trim() || 'Pago con Apple Pay';
+      state.gastos.push({id: newId(), fecha: fecha.getFullYear() + '-' + String(fecha.getMonth() + 1).padStart(2, '0') + '-' + String(fecha.getDate()).padStart(2, '0'),
+        concepto, categoria: sugerirCategoria(concepto, mapa), importe: round2(importe)});
+      n++;
+    }
+    state.config.pagosProcesados = [...hechos].slice(-300);
+    save();
+    try { await sb.from('pagos_pendientes').delete().in('id', data.map((p) => p.id)); } catch (e) { /* se reintentará; ya están marcados */ }
+    if (n) { render(); toast(n === 1 ? 'Se ha añadido 1 pago con Apple Pay' : 'Se han añadido ' + n + ' pagos con Apple Pay'); }
+    else if (prueba) toast('¡El atajo funciona! Ya puedes pagar con Apple Pay');
+    return n;
+  } catch (e) {
+    return 0;
+  } finally {
+    recogiendoPagos = false;
+  }
+}
+
+function botonCopiar(texto, etiqueta) {
+  return h('button', {class: 'btn sm', type: 'button', onclick: async () => {
+    try { await navigator.clipboard.writeText(texto); toast(etiqueta + ' copiado'); }
+    catch (e) { toast('No se pudo copiar: mantén pulsado el texto para copiarlo'); }
+  }}, 'Copiar');
+}
+function datoCopiable(titulo, valor, etiqueta) {
+  return h('div', {class: 'dato-copia'},
+    h('span', {class: 'lbl'}, titulo),
+    h('div', {class: 'dato-fila'}, h('code', null, valor), botonCopiar(valor, etiqueta)));
+}
+
+function vistaApplePay() {
+  const activo = !!state.config.applePay;
+  const out = [volver(),
+    h('section', {class: 'heroe heroe-peq'},
+      h('div', {class: 'apay-cab'}, h('span', {class: 'avatar', style: '--c:#f5f5f7'}, icono('billete')), h('span', {class: 'pill ' + (activo ? 'pill-ok' : '')}, activo ? 'Activado' : 'Desactivado')),
+      h('span', {class: 'num-m'}, 'Pagos con Apple Pay'),
+      h('span', {class: 'heroe-sub'}, 'Cada vez que pagues acercando el iPhone o el Apple Watch, el gasto se apunta solo en PatriApp, con su categoría.'))];
+
+  if (!nubeActiva()) {
+    out.push(h('section', {class: 'card'}, h('p', {class: 'empty'}, 'Necesitas iniciar sesión con tu cuenta para usar esta función.')));
+    return out;
+  }
+
+  const activar = async () => {
+    let token = null, error = null;
+    try { ({data: token, error} = await sb.rpc('crear_token_atajo')); } catch (e) { error = e; }
+    if (error || !token) return toast(/function|does not exist|schema cache/i.test(String(error && error.message)) ? 'Falta activar esta función en Supabase (actualización 9)' : 'No se pudo activar. ¿Tienes conexión?');
+    try { localStorage.setItem(ATAJO_KEY, JSON.stringify({uid: usuario.id, token})); } catch (e) { /* nada */ }
+    state.config.applePay = true;
+    save(); render();
+    toast('Activado: ahora crea el atajo en tu iPhone');
+  };
+  const desactivar = async () => {
+    if (!(await confirmar('El atajo dejará de funcionar y se borrará tu código. Puedes volver a activarlo cuando quieras.', {titulo: '¿Desactivar Apple Pay?', aceptar: 'Desactivar', peligro: true}))) return;
+    try { await sb.rpc('desactivar_atajo'); } catch (e) { /* se desactiva igualmente en la app */ }
+    try { localStorage.removeItem(ATAJO_KEY); } catch (e) { /* nada */ }
+    state.config.applePay = false;
+    save(); render(); toast('Desactivado');
+  };
+
+  if (!activo) {
+    out.push(h('section', {class: 'card'},
+      h('h2', null, 'Cómo funciona'),
+      h('ul', {class: 'pasos'},
+        h('li', null, 'Al activarlo se crea un ', h('b', null, 'código secreto'), ' solo para ti.'),
+        h('li', null, 'Creas una automatización en la app ', h('b', null, 'Atajos'), ' del iPhone (te lo explico paso a paso).'),
+        h('li', null, 'Al pagar con Apple Pay, el atajo envía el importe y el comercio a tu cuenta, sin abrir nada.'),
+        h('li', null, 'Al abrir PatriApp, los pagos aparecen apuntados con su categoría.')),
+      h('p', {class: 'note'}, 'Solo capta pagos con Apple Pay en tiendas. Para la tarjeta física o compras online, usa «Importar del banco»: no se duplican.'),
+      h('button', {class: 'btn pri ancho', type: 'button', onclick: activar}, 'Activar')));
+    return out;
+  }
+
+  const token = codigoAtajo();
+  const cuerpo = h('div', {class: 'tabla-json'},
+    h('div', null, h('code', null, 'token'), h('span', null, 'Texto → tu código')),
+    h('div', null, h('code', null, 'importe'), h('span', null, 'Texto → variable «Importe»')),
+    h('div', null, h('code', null, 'comercio'), h('span', null, 'Texto → variable «Comercio»')));
+  out.push(h('section', {class: 'card'},
+    h('h2', null, 'Crea el atajo en tu iPhone'),
+    h('ol', {class: 'pasos numerados'},
+      h('li', null, 'Abre la app ', h('b', null, 'Atajos'), ' → pestaña ', h('b', null, 'Automatización'), ' → ', h('b', null, '+'), '.'),
+      h('li', null, 'Elige ', h('b', null, 'Transacción'), ' (o «Cartera»). Marca tus tarjetas, deja todas las categorías, elige ', h('b', null, 'Ejecutar inmediatamente'), ' y pulsa ', h('b', null, 'Siguiente'), ' → ', h('b', null, 'Nueva automatización en blanco'), '.'),
+      h('li', null, 'Añade la acción ', h('b', null, 'Obtener contenido de URL'), ' y pega la dirección:'),
+      h('li', {class: 'sin-num'}, datoCopiable('URL', urlAtajo(), 'URL')),
+      h('li', null, 'Toca la flecha ', h('b', null, '›'), ' de la acción: ', h('b', null, 'Método'), ' → POST. En ', h('b', null, 'Cabeceras'), ' añade:'),
+      h('li', {class: 'sin-num'}, datoCopiable('apikey', claveAtajo(), 'Clave'), datoCopiable('Content-Type', 'application/json', 'Content-Type')),
+      h('li', null, 'En ', h('b', null, 'Cuerpo de la solicitud'), ' elige ', h('b', null, 'JSON'), ' y añade tres campos de tipo Texto:'),
+      h('li', {class: 'sin-num'}, cuerpo, token ? datoCopiable('Tu código (token)', token, 'Código') : h('p', {class: 'empty'}, 'El código se creó en otro dispositivo. Pulsa «Cambiar código» para verlo aquí.')),
+      h('li', null, 'Para «Importe» y «Comercio», toca el campo y elige la variable del pago que ofrece Atajos. Pulsa ', h('b', null, 'OK'), ' y listo.')),
+    h('p', {class: 'note'}, 'El código solo sirve para añadir pagos a tu cuenta: no permite leer tus datos. No lo compartas.')));
+  out.push(h('section', {class: 'card'},
+    h('h2', null, 'Comprobar'),
+    h('p', {class: 'note'}, 'Tras tu primer pago con Apple Pay, abre PatriApp: verás el aviso con los pagos añadidos. También puedes probar la conexión ahora:'),
+    h('div', {class: 'btns'},
+      h('button', {class: 'btn', type: 'button', onclick: async () => {
+        if (!token) return toast('Pulsa «Cambiar código» para tenerlo en este dispositivo');
+        try {
+          const r = await fetch(urlAtajo(), {method: 'POST', headers: {apikey: claveAtajo(), 'Content-Type': 'application/json'}, body: JSON.stringify({token, importe: '0,01 €', comercio: 'PRUEBA PATRIAPP'})});
+          if (!r.ok) throw new Error(String(r.status));
+          await recogerPagos();
+        } catch (e) { toast('La conexión ha fallado (' + e.message + ')'); }
+      }}, 'Probar conexión'),
+      h('button', {class: 'btn', type: 'button', onclick: async () => { const n = await recogerPagos(); if (!n) toast('No hay pagos nuevos'); }}, 'Buscar pagos ahora'))),
+    h('section', {class: 'card'},
+      h('div', {class: 'btns'},
+        h('button', {class: 'btn', type: 'button', onclick: async () => {
+          if (!(await confirmar('El código antiguo dejará de funcionar: tendrás que pegar el nuevo en el atajo.', {titulo: '¿Cambiar el código?', aceptar: 'Cambiar'}))) return;
+          activar();
+        }}, 'Cambiar código'),
+        h('button', {class: 'btn dan', type: 'button', onclick: desactivar}, 'Desactivar'))));
+  return out;
 }

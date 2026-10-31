@@ -1036,7 +1036,9 @@ function vistaAjustes() {
       h('div', {class: 'segmentos', role: 'group', 'aria-label': 'Tema'}, opcion('auto', 'Automático'), opcion('claro', 'Claro'), opcion('oscuro', 'Oscuro')),
       h('p', {class: 'note'}, '«Automático» sigue el modo del iPhone.')),
     h('h3', {class: 'grupo-tit'}, 'Cuenta'),
-    h('ul', {class: 'grupo'}, filaAjuste('#cuenta', 'usuario', '#76e78e', 'Cuenta y seguridad', correo)),
+    h('ul', {class: 'grupo'},
+      filaAjuste('#cuenta', 'usuario', '#76e78e', 'Cuenta y seguridad', correo),
+      filaAjuste('#applepay', 'billete', '#f5f5f7', 'Pagos con Apple Pay', state.config.applePay ? 'Activado: los pagos se apuntan solos' : 'Desactivado')),
     h('h3', {class: 'grupo-tit'}, 'Tu dinero'),
     h('ul', {class: 'grupo'},
       filaAjuste('#reglas', 'regla', '#22d3ee', 'Reglas y preferencias', 'Reparto de la nómina, TAE, colchón'),
@@ -1163,6 +1165,7 @@ const VISTAS = {
   recurrentes: [() => vistaRecurrentes(), 'gastos', 'Recurrentes'],
   bienvenida: [() => vistaBienvenida(), 'panel', 'Bienvenida'],
   versiones: [() => vistaVersiones(), 'ajustes', 'Versiones'],
+  applepay: [() => vistaApplePay(), 'ajustes', 'Apple Pay'],
   // direcciones antiguas
   cartera: [vistaInversion, 'inversion', 'Inversión'],
   mas: [vistaAjustes, 'ajustes', 'Ajustes']

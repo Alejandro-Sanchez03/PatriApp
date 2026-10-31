@@ -441,3 +441,25 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 .tut-puntos span { width: 7px; height: 7px; border-radius: 99px; background: var(--muted-bar); transition: width .25s, background .25s; }
 .tut-puntos span.activo { width: 22px; background: var(--accent); }
 .tut-saltar { color: var(--muted) !important; font-weight: 500 !important; }
+
+/* ── Apple Pay ── */
+.apay-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.pill:not(.pill-ok):not(.pill-bad) { background: var(--grid); color: var(--muted); }
+.pasos.numerados { counter-reset: paso; list-style: none; padding-left: 0; gap: 12px; }
+.pasos.numerados > li:not(.sin-num) { counter-increment: paso; position: relative; padding-left: 34px; }
+.pasos.numerados > li:not(.sin-num)::before { content: counter(paso); position: absolute; left: 0; top: -1px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-fg); font-weight: 750; font-size: .8rem; }
+.pasos .sin-num { list-style: none; display: grid; gap: 8px; }
+.dato-copia { display: grid; gap: 4px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.dato-fila { display: flex; align-items: center; gap: 10px; }
+.dato-fila code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .82rem; color: var(--fg); user-select: all; -webkit-user-select: all; }
+.tabla-json { display: grid; gap: 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: .85rem; }
+.tabla-json div { display: flex; justify-content: space-between; gap: 10px; }
+.tabla-json code { color: var(--accent); font-weight: 600; }
+.tut-caja { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 12px 14px; border-radius: 14px; max-width: 32ch; text-align: left;
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); color: var(--fg); font-size: .92rem; font-weight: 500; }
+.tut-caja .ico-svg { color: var(--accent); }
+.pasos > li, .pasos .sin-num, .dato-copia, .tabla-json { min-width: 0; }
+.tabla-json div { min-width: 0; }
+.tabla-json span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.tut-puntos[hidden] { display: none; }
+.pasos, .pasos .sin-num, .dato-copia, .tabla-json { grid-template-columns: minmax(0, 1fr); }

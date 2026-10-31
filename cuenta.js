@@ -449,6 +449,7 @@ function tareasTrasCargar() {
   if (n) { save(); render(); toast(n === 1 ? 'Se ha apuntado 1 gasto recurrente' : 'Se han apuntado ' + n + ' gastos recurrentes'); }
   guardarCopiaLocal();
   publicarIsins();
+  recogerPagos();
   if (state.config.preciosAuto) actualizarPrecios(false);
 }
 
@@ -587,7 +588,7 @@ document.addEventListener('visibilitychange', () => {
     desbloqueado = false;
     return mostrar(pantallaBloqueo(() => { salirDePantalla(); sincronizar(); tareasTrasCargar(); }));
   }
-  if (!window.pantallaCuenta) { sincronizar(); tareasTrasCargar(); }
+  if (!window.pantallaCuenta) { sincronizar().then(() => recogerPagos()); if (state.config.preciosAuto) actualizarPrecios(false); }
 });
 window.addEventListener('online', () => { if (usuario) sincronizar(); });
 
