@@ -18,6 +18,12 @@ const DEFAULT_CONFIG = {
   margen: 250,       // € que se quedan en la cuenta corriente además de los gastos previstos
   cuotaCoche: 0,     // € al mes de la cuota del coche (0 = no mostrar)
   interesTR: 0,      // % TAE de la cuenta remunerada (0 = no mostrar intereses)
+  fireGasto: 0,      // objetivo FIRE: gasto mensual al retirarse (0 = calcularlo)
+  fireAporte: 0,     // aportación mensual (0 = calcularla con las transferencias)
+  fireRent: 5,       // rentabilidad anual esperada (%)
+  fireTasa: 4,       // tasa de retirada (%)
+  fireEdad: 0,       // edad actual (0 = no mostrar)
+  fireBase: 'inversion', // 'inversion' (inversión + ahorro) o 'todo' (todo el patrimonio)
   preciosAuto: true, // al abrir, aplicar los precios de precios.json del repositorio
   fuentePrecios: ''  // dirección de precios.json ('' = la del propio repositorio de GitHub)
 };
@@ -132,10 +138,11 @@ function normalize(raw) {
   const s = emptyState();
   if (!raw || typeof raw !== 'object') return s;
   s.config = {...DEFAULT_CONFIG, ...(raw.config && typeof raw.config === 'object' ? raw.config : {})};
-  for (const k of ['mesesColchon', 'pctTR', 'margen', 'cuotaCoche', 'interesTR']) s.config[k] = Number(s.config[k]) || 0;
+  for (const k of ['mesesColchon', 'pctTR', 'margen', 'cuotaCoche', 'interesTR', 'fireGasto', 'fireAporte', 'fireRent', 'fireTasa', 'fireEdad']) s.config[k] = Number(s.config[k]) || 0;
   s.config.nombre = String(s.config.nombre || '');
   s.config.preciosAuto = s.config.preciosAuto !== false;
   s.config.fuentePrecios = String(s.config.fuentePrecios || '');
+  s.config.fireBase = s.config.fireBase === 'todo' ? 'todo' : 'inversion';
   for (const [k, sch] of Object.entries(SCHEMAS)) {
     const rows = Array.isArray(raw[k]) ? raw[k] : [];
     s[k] = rows.filter((r) => r && typeof r === 'object').map((r) => {
@@ -420,6 +427,9 @@ function vistaPanel() {
     kpi('Disponible', eur0.format(res.liquidez), 'banco', '#94a3b8', '#saldos'),
     kpi('Invertido', eur0.format(res.inversion + ahorro), 'inversion', '#76e78e', '#inversion'),
     kpi('Colchón', col.gastoMes ? col.meses.toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' meses' : '—', 'escudo', '#fbbf24', '#saldos')));
+
+  // Objetivo FIRE
+  if (st.saldos.length) out.push(tarjetaFire());
 
   // Este mes
   const mesHoy = hoy().slice(0, 7);
@@ -714,7 +724,7 @@ function vistaGastos() {
   }
 
   out.push(h('section', {class: 'card'},
-    h('div', {class: 'card-cab'}, h('h2', null, 'Movimientos'), h('span', {class: 'sub'}, String(delMes.length))),
+    h('div', {class: 'card-cab'}, h('h2', null, 'Movimientos · ' + delMes.length), h('a', {class: 'btn-txt', href: '#importar'}, icono('copia'), 'Importar del banco')),
     delMes.length
       ? h('ul', {class: 'lista'}, delMes.map((g) => h('li', null,
         h('button', {class: 'fila', type: 'button', onclick: () => editRow('gastos', g.id)},
@@ -952,11 +962,14 @@ function vistaAjustes() {
     h('h3', {class: 'grupo-tit'}, 'Tu dinero'),
     h('ul', {class: 'grupo'},
       filaAjuste('#reglas', 'regla', '#22d3ee', 'Reglas y preferencias', 'Reparto de la nómina, TAE, colchón'),
+      filaAjuste('#fire', 'inversion', '#76e78e', 'Objetivo FIRE', 'Cuánto necesitas y cuándo llegas'),
       filaAjuste('#nominas', 'documento', '#7aa2ff', 'Nóminas y transferencias'),
       filaAjuste('#presupuesto', 'tarta', '#f472b6', 'Presupuesto'),
       filaAjuste('#historial', 'reloj', '#fbbf24', 'Historial de saldos')),
     h('h3', {class: 'grupo-tit'}, 'Datos'),
-    h('ul', {class: 'grupo'}, filaAjuste('#datos', 'copia', '#94a3b8', 'Copia de seguridad', 'Exportar, importar o borrar')),
+    h('ul', {class: 'grupo'},
+      filaAjuste('#importar', 'banco', '#7aa2ff', 'Importar del banco', 'Excel o CSV de BBVA u otro banco'),
+      filaAjuste('#datos', 'copia', '#94a3b8', 'Copia de seguridad', 'Exportar, importar o borrar')),
     h('p', {class: 'pie'}, 'PatriApp')
   ];
 }
@@ -1057,6 +1070,8 @@ const VISTAS = {
   historial: [vistaHistorial, 'saldos', 'Historial'],
   datos: [vistaDatos, 'ajustes', 'Copia de seguridad'],
   cuenta: [() => vistaCuenta(), 'ajustes', 'Cuenta'],
+  fire: [() => vistaFire(), 'panel', 'Objetivo FIRE'],
+  importar: [() => vistaImportar(), 'gastos', 'Importar'],
   // direcciones antiguas
   cartera: [vistaInversion, 'inversion', 'Inversión'],
   mas: [vistaAjustes, 'ajustes', 'Ajustes']
@@ -1083,7 +1098,7 @@ function render() {
   const correo = typeof usuario !== 'undefined' && usuario ? usuario.email : '';
   document.getElementById('avatar').textContent = ((nombreUsuario || correo || 'P').trim()[0] || 'P').toUpperCase();
   const fab = document.getElementById('fab');
-  fab.hidden = !(tab === 'panel' || tab === 'gastos') || nombre === 'presupuesto';
+  fab.hidden = !(tab === 'panel' || tab === 'gastos') || ['presupuesto', 'importar', 'fire'].includes(nombre);
   document.querySelectorAll('.tabs [data-ico]').forEach((el) => { if (!el.firstChild) el.append(icono(el.dataset.ico)); });
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');

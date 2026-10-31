@@ -57,7 +57,7 @@ const CATEGORIAS_ESTILO = [
   [/alojamiento|hotel|booking/i, 'cama', '#a78bfa'],
   [/apartamento|alquiler|hipoteca|vivienda|piso|casa/i, 'casa', '#7aa2ff'],
   [/restaurante|comida fuera|bar|cafeter|cena/i, 'comida', '#ff8a65'],
-  [/suscrip/i, 'repetir', '#22d3ee'],
+  [/suscrip|netflix|spotify|hbo|disney|prime video|icloud|apple\.com|youtube premium/i, 'repetir', '#22d3ee'],
   [/fisio|salud|m[eé]dic|farmacia|dentista/i, 'salud', '#fb7185'],
   [/deport|gimnasio|material/i, 'deporte', '#34d399'],
   [/compras|amazon|online|ropa|wallapop/i, 'bolsa', '#fbbf24'],
@@ -126,11 +126,13 @@ function confirmar(texto, {titulo, aceptar = 'Aceptar', cancelar = 'Cancelar', p
 /* ───────────── Gráfico de área de la evolución ───────────── */
 
 /* puntos: [{fecha, valor}] ordenados. alMover(p | null) se llama al deslizar el dedo por el gráfico. */
-function graficoArea(puntos, alMover) {
+function graficoArea(puntos, alMover, {meta} = {}) {
   const wrap = h('div', {class: 'area'});
   const W = Math.max(280, (document.getElementById('vista').clientWidth || 360) - 8), H = 150, pad = 6;
   const vals = puntos.map((p) => p.valor);
+  if (meta) vals.push(meta);
   let min = Math.min(...vals), max = Math.max(...vals);
+  if (meta) min = Math.min(min, 0);
   if (max - min < 1) { min -= 50; max += 50; }
   const margen = (max - min) * 0.15;
   min -= margen; max += margen;
@@ -154,6 +156,10 @@ function graficoArea(puntos, alMover) {
   svg.append(defs,
     s('path', {d: d + ` L${xy[xy.length - 1][0]},${H} L${xy[0][0]},${H} Z`, fill: `url(#${id})`}),
     s('path', {d, fill: 'none', stroke: subeOBaja, 'stroke-width': '2.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'area-linea'}));
+  if (meta) {
+    svg.append(s('line', {x1: '0', x2: String(W), y1: y(meta), y2: y(meta), stroke: css('--warn'), 'stroke-width': '1.5', 'stroke-dasharray': '6 5'}),
+      s('text', {x: String(W - 6), y: String(y(meta) - 6), 'text-anchor': 'end', fill: css('--warn'), 'font-size': '12', 'font-weight': '600'}, 'Objetivo ' + eur0.format(meta)));
+  }
   const guia = s('line', {y1: '0', y2: String(H), stroke: css('--muted'), 'stroke-width': '1', 'stroke-dasharray': '3 3', opacity: '0'});
   const punto = s('circle', {r: '5', fill: subeOBaja, stroke: css('--bg'), 'stroke-width': '2', opacity: '0'});
   const ultimo = xy[xy.length - 1];

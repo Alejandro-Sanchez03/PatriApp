@@ -187,11 +187,71 @@ async function pinCorrecto(pin) {
 const campoPin = (name, label) => h('label', {class: 'f'}, label,
   h('input', {type: 'password', name, inputmode: 'numeric', pattern: '[0-9]{4,6}', minlength: '4', maxlength: '6', required: true, autocomplete: 'off', class: 'pin', title: 'De 4 a 6 cifras'}));
 
+/* ── Face ID / huella (llave de acceso del dispositivo, WebAuthn) ──
+ * Se usa para desbloquear la app en este dispositivo, como el PIN. La contraseña sigue siendo la de tu cuenta. */
+const BIO_KEY = 'patrimonio-faceid';
+let bioPosible = false;   // se comprueba al arrancar
+async function comprobarBio() {
+  try {
+    bioPosible = !!(window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable &&
+      await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+  } catch (e) { bioPosible = false; }
+}
+function bioGuardado() {
+  try {
+    const p = JSON.parse(ls.get(BIO_KEY));
+    return p && usuario && p.uid === usuario.id ? p : null;
+  } catch (e) { return null; }
+}
+const reto = () => crypto.getRandomValues(new Uint8Array(32));
+async function activarBio() {
+  const cred = await navigator.credentials.create({publicKey: {
+    challenge: reto(),
+    rp: {name: 'PatriApp', id: location.hostname},
+    user: {id: new TextEncoder().encode(usuario.id), name: usuario.email, displayName: usuario.email},
+    pubKeyCredParams: [{type: 'public-key', alg: -7}, {type: 'public-key', alg: -257}],
+    authenticatorSelection: {authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred'},
+    timeout: 60000
+  }});
+  ls.set(BIO_KEY, JSON.stringify({uid: usuario.id, id: b64(cred.rawId)}));
+}
+async function verificarBio() {
+  const p = bioGuardado();
+  if (!p) return false;
+  const r = await navigator.credentials.get({publicKey: {
+    challenge: reto(),
+    rpId: location.hostname,
+    allowCredentials: [{type: 'public-key', id: deB64(p.id), transports: ['internal', 'hybrid']}],
+    userVerification: 'required',
+    timeout: 60000
+  }});
+  return !!r;
+}
+const bloqueoActivo = () => !!(pinGuardado() || bioGuardado());
+const nombreBio = () => /iPhone|iPad|Mac/i.test(navigator.userAgent) ? 'Face ID' : 'huella o Face ID';
+
 let desbloqueado = false;
 function pantallaBloqueo(alAbrir, aviso) {
   return () => {
+    const bio = bioGuardado(), pin = pinGuardado();
+    const probarBio = async () => {
+      try {
+        if (await verificarBio()) { ls.del(PIN_FALLOS); desbloqueado = true; return alAbrir(); }
+      } catch (e) {
+        if (e && e.name !== 'NotAllowedError' && e.name !== 'AbortError') console.error(e);
+      }
+    };
+    if (bio && !aviso) setTimeout(probarBio, 250);   // se intenta solo al abrir
+    const botonBio = bio ? h('button', {class: 'btn pri ancho', type: 'button', onclick: probarBio}, 'Desbloquear con ' + nombreBio()) : null;
+    if (!pin) {
+      return tarjeta('App bloqueada', aviso || {texto: usuario ? usuario.email : ''}, botonBio,
+        h('div', {class: 'acceso-enlaces'}, enlace('Entrar con mi contraseña', async () => {
+          await cerrarSesion({sinPreguntar: true});
+          mostrar(pantallaLogin());
+        })));
+    }
     const form = h('form', {class: 'form'}, campoPin('pin', 'Código'),
-      h('div', {class: 'btns'}, h('button', {class: 'btn pri ancho', type: 'submit'}, 'Desbloquear')));
+      h('div', {class: 'btns'}, h('button', {class: 'btn ' + (bio ? '' : 'pri ') + 'ancho', type: 'submit'}, 'Desbloquear con código')));
     alEnviar(form, async (e) => {
       if (await pinCorrecto(e.pin.value)) {
         ls.del(PIN_FALLOS);
@@ -206,8 +266,8 @@ function pantallaBloqueo(alAbrir, aviso) {
       }
       mostrar(pantallaBloqueo(alAbrir, {texto: 'Código incorrecto. Te quedan ' + (MAX_FALLOS_PIN - fallos) + ' intentos.', tipo: 'bad'}));
     });
-    setTimeout(() => { const i = document.querySelector('input.pin'); if (i) i.focus(); }, 50);
-    return tarjeta('App bloqueada', aviso || {texto: usuario ? usuario.email : ''}, form,
+    if (!bio) setTimeout(() => { const i = document.querySelector('input.pin'); if (i) i.focus(); }, 50);
+    return tarjeta('App bloqueada', aviso || {texto: usuario ? usuario.email : ''}, botonBio, form,
       h('div', {class: 'acceso-enlaces'}, enlace('He olvidado el código', async () => {
         if (!(await confirmar('Se cerrará la sesión y tendrás que entrar con tu contraseña.', {titulo: '¿Has olvidado el código?', aceptar: 'Cerrar sesión'}))) return;
         await cerrarSesion({sinPreguntar: true});
@@ -347,7 +407,7 @@ async function entrar(user, {recienEntrado} = {}) {
   usuario = {id: user.id, email: user.email};
   persistir = persistirNube;
   // Al iniciar sesión con contraseña no hace falta pedir también el código.
-  if (pinGuardado() && !recienEntrado && !desbloqueado) return mostrar(pantallaBloqueo(() => cargarDatos()));
+  if (bloqueoActivo() && !recienEntrado && !desbloqueado) return mostrar(pantallaBloqueo(() => cargarDatos()));
   desbloqueado = true;
   await cargarDatos();
 }
@@ -389,7 +449,7 @@ async function cerrarSesion({sinPreguntar} = {}) {
   if (!sinPreguntar && !(await confirmar('Tendrás que volver a entrar con tu email y contraseña.', {titulo: '¿Cerrar sesión?', aceptar: 'Cerrar sesión', peligro: true}))) return false;
   if (nube.pendiente) { try { await subir(); } catch (e) { /* se intentó */ } }
   if (usuario) ls.del(claveCache());
-  ls.del(PIN_KEY); ls.del(PIN_FALLOS);
+  ls.del(PIN_KEY); ls.del(PIN_FALLOS); ls.del(BIO_KEY);
   usuario = null; desbloqueado = false;   // antes de signOut, para que no se tome como sesión caducada
   try { await sb.auth.signOut({scope: 'local'}); } catch (e) { /* sin conexión: la sesión local se borra igual */ }
   state = emptyState();
@@ -447,7 +507,22 @@ function vistaCuenta() {
         pin ? h('button', {class: 'btn dan', type: 'button', onclick: async () => {
           if (!(await confirmar('Ya no se pedirá el código al abrir la app en este dispositivo.', {titulo: '¿Quitar el código?', aceptar: 'Quitar', peligro: true}))) return;
           ls.del(PIN_KEY); render(); toast('Código quitado');
-        }}, 'Quitar código') : null))];
+        }}, 'Quitar código') : null)),
+    h('section', {class: 'card'},
+      h('h2', null, nombreBio()),
+      bioPosible
+        ? [h('p', {class: 'note'}, bioGuardado()
+            ? 'Activado en este dispositivo: al abrir la app se desbloquea con ' + nombreBio() + '.'
+            : 'Desbloquea la app con ' + nombreBio() + ' en lugar de escribir el código.'),
+          bioGuardado()
+            ? h('button', {class: 'btn dan', type: 'button', onclick: async () => {
+              if (!(await confirmar('Ya no se usará ' + nombreBio() + ' para abrir la app en este dispositivo.', {titulo: '¿Desactivar ' + nombreBio() + '?', aceptar: 'Desactivar', peligro: true}))) return;
+              ls.del(BIO_KEY); render(); toast(nombreBio() + ' desactivado');
+            }}, 'Desactivar')
+            : h('button', {class: 'btn pri', type: 'button', onclick: async () => {
+              try { await activarBio(); desbloqueado = true; render(); toast(nombreBio() + ' activado'); } catch (e) { toast(e && e.name === 'NotAllowedError' ? 'Cancelado' : 'No se pudo activar en este dispositivo'); }
+            }}, 'Activar ' + nombreBio())]
+        : h('p', {class: 'note'}, 'Este dispositivo o navegador no permite desbloquear con ' + nombreBio() + '. En iPhone funciona con la app instalada desde Safari.'))];
 }
 
 /* ───────────────────────── Arranque ───────────────────────── */
@@ -464,7 +539,7 @@ document.addEventListener('visibilitychange', () => {
     return;
   }
   if (!usuario) { if (!CONFIGURADO && state.config.preciosAuto) actualizarPrecios(false); return; }
-  if (pinGuardado() && ocultoDesde && Date.now() - ocultoDesde > BLOQUEO_TRAS_MS && !window.pantallaCuenta) {
+  if (bloqueoActivo() && ocultoDesde && Date.now() - ocultoDesde > BLOQUEO_TRAS_MS && !window.pantallaCuenta) {
     desbloqueado = false;
     return mostrar(pantallaBloqueo(() => { salirDePantalla(); sincronizar(); tareasTrasCargar(); }));
   }
@@ -473,6 +548,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('online', () => { if (usuario) sincronizar(); });
 
 async function arrancar() {
+  await comprobarBio();
   if (!CONFIGURADO) {
     // Sin Supabase: como antes, todo en este dispositivo.
     state = loadLocal();
