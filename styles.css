@@ -4,7 +4,7 @@
   --fg: #1d1d1b;
   --muted: #6b6a64;
   --line: #e3e1da;
-  --accent: #1f6f5c;
+  --accent: #16804a;
   --accent-fg: #ffffff;
   --ok: #1f7a4d;
   --bad: #b3261e;
@@ -27,8 +27,8 @@
     --fg: #ecebe6;
     --muted: #a3a29b;
     --line: #34332f;
-    --accent: #4fb596;
-    --accent-fg: #0d1d18;
+    --accent: #76e78e;
+    --accent-fg: #011811;
     --ok: #5cc68f;
     --bad: #f08a80;
     --warn: #e0a84a;
@@ -70,7 +70,7 @@ button, input, select { font: inherit; color: inherit; }
 .acceso { max-width: 26rem; width: 100%; margin: 6vh auto 0; gap: 12px; padding: 24px 20px; }
 .acceso h2 { text-align: center; font-family: var(--serif); font-weight: 400; font-size: 1.4rem; }
 .acceso-logo { display: flex; justify-content: center; }
-.acceso-logo img { border-radius: 14px; }
+.acceso-logo img { border-radius: 16px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
 .acceso-enlaces { display: grid; justify-items: center; gap: 6px; margin-top: 4px; }
 .aviso { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--grid); font-size: .88rem; text-align: center; }
 .aviso.bad { color: var(--bad); }

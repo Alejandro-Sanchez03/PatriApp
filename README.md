@@ -1,4 +1,4 @@
-# Mi Patrimonio
+# PatriApp
 
 App web instalable (PWA) para seguir el patrimonio: saldos por cuenta, gastos, nóminas y su reparto, presupuesto mensual, cartera indexada y evolución del patrimonio. Es la versión independiente del panel «Finanzas» que tenía en Claude.
 
@@ -77,5 +77,5 @@ Funciona sin conexión después de abrirla una vez.
 | `config.js` | Datos de tu proyecto de Supabase |
 | `supabase/esquema.sql` | Tabla y reglas de seguridad de la base de datos |
 | `vendor/supabase.js` | Librería de Supabase (v2.45.4, licencia MIT) |
-| `manifest.webmanifest`, `icon*` | Instalación como app |
-| `sw.js` | Funcionamiento sin conexión. Si cambias algún archivo, sube el número de `CACHE = 'patrimonio-v3'`. |
+| `manifest.webmanifest`, `icon-*.png`, `apple-touch-icon.png`, `favicon-32.png` | Nombre e iconos de la app |
+| `sw.js` | Funcionamiento sin conexión. Si cambias algún archivo, sube el número de `CACHE = 'patrimonio-v4'`. |

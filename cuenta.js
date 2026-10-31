@@ -57,7 +57,7 @@ function salirDePantalla() { window.pantallaCuenta = null; render(); }
 
 function tarjeta(titulo, aviso, ...contenido) {
   return h('section', {class: 'card acceso'},
-    h('div', {class: 'acceso-logo'}, h('img', {src: 'icon.svg', alt: '', width: '56', height: '56'})),
+    h('div', {class: 'acceso-logo'}, h('img', {src: 'icon-192.png', alt: 'PatriApp', width: '72', height: '72'})),
     h('h2', null, titulo),
     aviso ? h('p', {class: 'aviso ' + (aviso.tipo || ''), role: aviso.tipo === 'bad' ? 'alert' : 'status'}, aviso.texto) : null,
     contenido);

@@ -1,4 +1,4 @@
-/* Mi Patrimonio — app de seguimiento de patrimonio.
+/* PatriApp — app de seguimiento de patrimonio.
  * Todo se guarda en este dispositivo (localStorage). Nada se envía a ningún servidor.
  * Usa «Más → Copia de seguridad» para exportar o importar tus datos en JSON. */
 'use strict';
@@ -844,7 +844,7 @@ function vistaAjustes() {
   const f = (k, l, attrs) => h('label', {class: 'f', for: 'c-' + k}, l, h('input', {id: 'c-' + k, name: k, value: String(c[k]), ...attrs}));
   const form = h('form', {class: 'form'},
     h('div', {class: 'row'},
-      f('nombre', 'Tu nombre (título de la app)', {type: 'text', autocomplete: 'off'}),
+      f('nombre', 'Tu nombre (aparece junto a PatriApp)', {type: 'text', autocomplete: 'off'}),
       f('margen', 'Margen en la cuenta corriente (€)', {type: 'number', step: '1', inputmode: 'decimal'}),
       h('label', {class: 'f', for: 'c-pctTR'}, '% de lo que sobra a la cuenta remunerada',
         h('input', {id: 'c-pctTR', name: 'pctTR', type: 'number', step: '1', min: '0', max: '100', value: String(Math.round(c.pctTR * 100))})),
@@ -939,7 +939,7 @@ function render() {
   /* Pantallas de inicio de sesión, código, etc. (cuenta.js) */
   if (window.pantallaCuenta) {
     document.body.classList.add('sin-sesion');
-    document.getElementById('titulo').textContent = 'Mi Patrimonio';
+    document.getElementById('titulo').textContent = 'PatriApp';
     vista.replaceChildren(...[window.pantallaCuenta()].flat(Infinity).filter(Boolean));
     ultimaVista = null;
     return;
@@ -947,7 +947,7 @@ function render() {
   document.body.classList.remove('sin-sesion');
   const nombre = (location.hash || '#panel').slice(1);
   const [fn, tab] = VISTAS[nombre] || VISTAS.panel;
-  const titulo = state.config.nombre ? 'Finanzas de ' + state.config.nombre : 'Mi Patrimonio';
+  const titulo = state.config.nombre ? 'PatriApp · ' + state.config.nombre : 'PatriApp';
   document.getElementById('titulo').textContent = titulo;
   document.title = titulo;
   document.querySelectorAll('.tabs a').forEach((a) => {
