@@ -16,7 +16,9 @@ const DEFAULT_CONFIG = {
   mesesColchon: 6,   // meses de gastos que debe cubrir el colchón
   pctTR: 0.35,       // parte de lo que sobra que va a la cuenta remunerada
   margen: 250,       // € que se quedan en la cuenta corriente además de los gastos previstos
-  cuotaCoche: 0      // € al mes de la cuota del coche (0 = no mostrar)
+  cuotaCoche: 0,     // € al mes de la cuota del coche (0 = no mostrar)
+  preciosAuto: true, // al abrir, aplicar los precios de precios.json del repositorio
+  fuentePrecios: ''  // dirección de precios.json ('' = la del propio repositorio de GitHub)
 };
 
 /* Cada tabla editable: columnas, tipo y cómo se muestra. */
@@ -82,6 +84,8 @@ const SCHEMAS = {
       {k: 'tipo', l: 'Tipo', t: 'select', opts: TIPOS_FONDO},
       {k: 'participaciones', l: 'Participaciones', t: 'number'},
       {k: 'valor_liquidativo', l: 'Valor liquidativo', t: 'number'},
+      {k: 'moneda', l: 'Moneda', t: 'select', opts: ['EUR', 'USD']},
+      {k: 'fecha_vl', l: 'Fecha del precio', t: 'date'},
       {k: 'invertido', l: 'Invertido', t: 'money', req: true},
       {k: 'valor', l: 'Valor', t: 'money', req: true}
     ]
@@ -129,6 +133,8 @@ function normalize(raw) {
   s.config = {...DEFAULT_CONFIG, ...(raw.config && typeof raw.config === 'object' ? raw.config : {})};
   for (const k of ['mesesColchon', 'pctTR', 'margen', 'cuotaCoche']) s.config[k] = Number(s.config[k]) || 0;
   s.config.nombre = String(s.config.nombre || '');
+  s.config.preciosAuto = s.config.preciosAuto !== false;
+  s.config.fuentePrecios = String(s.config.fuentePrecios || '');
   for (const [k, sch] of Object.entries(SCHEMAS)) {
     const rows = Array.isArray(raw[k]) ? raw[k] : [];
     s[k] = rows.filter((r) => r && typeof r === 'object').map((r) => {
@@ -140,23 +146,28 @@ function normalize(raw) {
   return s;
 }
 
-function load() {
+/* Datos guardados solo en este dispositivo (modo sin cuenta, o versión antigua de la app). */
+function loadLocal() {
   try {
     const txt = localStorage.getItem(KEY);
     if (txt) return normalize(JSON.parse(txt));
   } catch (e) { /* almacenamiento no disponible o datos corruptos */ }
   return emptyState();
 }
-
-let state = load();
-
-function save() {
+function saveLocal(st) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    localStorage.setItem(KEY, JSON.stringify(st));
   } catch (e) {
     toast('No se pudo guardar en este dispositivo. Exporta una copia de seguridad.');
   }
 }
+const totalFilas = (st) => Object.keys(SCHEMAS).reduce((t, k) => t + st[k].length, 0);
+
+let state = emptyState();
+
+/* cuenta.js decide dónde se guarda: en tu cuenta (Supabase) o solo en este dispositivo. */
+let persistir = saveLocal;
+function save() { persistir(state); }
 
 /* ───────────────────────── Utilidades ───────────────────────── */
 
@@ -719,9 +730,87 @@ function vistaCartera() {
       tile('Aportado', eur2.format(res.invertido)),
       tile('Ganancia', h('span', {class: res.ganancia >= 0 ? 'ok' : 'bad'}, signed(res.ganancia)), (res.rentabilidad >= 0 ? '+' : '') + pct1.format(res.rentabilidad))) : null,
     state.cartera.length ? carteraCard(res) : null,
-    tablaEditable('cartera', {orden: (a, b) => b.valor - a.valor, cols: ['fondo', 'tipo', 'invertido', 'valor']}),
-    h('p', {class: 'note'}, 'Recuerda actualizar también el saldo de tu cuenta de inversión en «Saldos» para que cuente en el patrimonio.')
+    h('section', {class: 'card'},
+      h('h2', null, 'Precios de los fondos'),
+      h('p', {class: 'note'}, 'Cada lunes GitHub busca el valor liquidativo de cada ISIN. Al abrir la app se recalcula el valor de cada fondo con tus participaciones, el saldo de la cartera y se añade un punto a la evolución.'),
+      h('p', {class: 'note'}, preciosEstado),
+      h('div', {class: 'btns'}, h('button', {class: 'btn', type: 'button', onclick: () => actualizarPrecios(true)}, 'Buscar precios ahora'))),
+    tablaEditable('cartera', {orden: (a, b) => b.valor - a.valor, cols: ['fondo', 'participaciones', 'fecha_vl', 'valor']}),
+    h('p', {class: 'note'}, 'Para que los precios se actualicen solos, cada fondo necesita su ISIN y sus participaciones.')
   ];
+}
+
+/* ───────────────────────── Precios automáticos ───────────────────────── */
+
+let preciosEstado = 'Aún no se han consultado los precios en esta sesión.';
+
+/* precios.json lo genera cada lunes la acción de GitHub (scripts/precios.py).
+ * Se lee de raw.githubusercontent.com para tener siempre la última versión. */
+function urlPrecios() {
+  if (state.config.fuentePrecios) return state.config.fuentePrecios;
+  const host = location.hostname;
+  if (host.endsWith('.github.io')) {
+    const usuario = host.split('.')[0];
+    const repo = location.pathname.split('/').filter(Boolean)[0];
+    if (repo) return `https://raw.githubusercontent.com/${usuario}/${repo}/main/precios.json`;
+  }
+  return 'precios.json';
+}
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/* Aplica los precios a los fondos. Devuelve cuántos fondos cambiaron y la diferencia de valor. */
+function aplicarPrecios(datos) {
+  const fondos = (datos && datos.fondos) || {};
+  let cambiados = 0, antes = 0, despues = 0, fechaMax = '';
+  for (const f of state.cartera) {
+    const p = fondos[String(f.isin).trim().toUpperCase()];
+    if (!p || !(Number(p.vl_eur) > 0) || !(f.participaciones > 0)) continue;
+    const fecha = String(p.fecha || '').slice(0, 10);
+    if (f.fecha_vl && fecha && fecha <= f.fecha_vl) continue; // ya aplicado o más antiguo
+    const nuevo = round2(f.participaciones * Number(p.vl_eur));
+    antes += f.valor; despues += nuevo;
+    f.valor = nuevo;
+    f.valor_liquidativo = Number(p.vl) || f.valor_liquidativo;
+    if (p.moneda) f.moneda = String(p.moneda);
+    if (fecha) { f.fecha_vl = fecha; if (fecha > fechaMax) fechaMax = fecha; }
+    cambiados++;
+  }
+  if (cambiados) {
+    // El saldo de la cuenta de la cartera pasa a ser el valor total de los fondos.
+    const inv = state.saldos.filter((r) => r.grupo === 'Inversión');
+    const cuenta = inv.find((r) => /^cartera indexada$/i.test(r.cuenta.trim())) || inv.find((r) => !/por invertir/i.test(r.cuenta));
+    if (cuenta) cuenta.saldo = round2(sum(state.cartera, (r) => r.valor));
+    fotoSaldos(hoy());
+    save();
+  }
+  return {cambiados, diferencia: round2(despues - antes), fecha: fechaMax};
+}
+
+let buscandoPrecios = false;
+async function actualizarPrecios(manual) {
+  if (buscandoPrecios || !state.cartera.some((f) => f.isin)) {
+    if (manual) toast('Añade el ISIN de tus fondos para poder buscar precios');
+    return;
+  }
+  buscandoPrecios = true;
+  try {
+    const res = await fetch(urlPrecios() + '?t=' + Date.now(), {cache: 'no-store'});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const datos = await res.json();
+    const r = aplicarPrecios(datos);
+    const cuando = datos.actualizado ? new Date(datos.actualizado).toLocaleDateString('es-ES', {day: 'numeric', month: 'long'}) : '—';
+    const faltan = state.cartera.filter((f) => f.isin && !(datos.fondos || {})[String(f.isin).trim().toUpperCase()]).length;
+    preciosEstado = 'Precios consultados por última vez el ' + cuando + '.' + (faltan ? ' Sin precio para ' + faltan + ' fondo(s).' : '');
+    if (r.cambiados) toast('Precios del ' + fechaCorta(r.fecha) + ': cartera ' + signed(r.diferencia));
+    else if (manual) toast('Los precios ya estaban al día');
+    render();
+  } catch (e) {
+    preciosEstado = 'No se pudieron leer los precios (' + (navigator.onLine ? 'aún no hay precios.json o falló la descarga' : 'sin conexión') + ').';
+    if (manual) { toast('No se pudieron leer los precios'); render(); }
+  } finally {
+    buscandoPrecios = false;
+  }
 }
 
 function vistaMas() {
@@ -730,7 +819,8 @@ function vistaMas() {
     ['#presupuesto', 'Gastos previstos', 'Presupuesto por mes y categoría'],
     ['#historial', 'Historial de saldos', 'Las fotos de la evolución del patrimonio'],
     ['#ajustes', 'Reglas de reparto', 'Margen, porcentajes, colchón y cuota del coche'],
-    ['#datos', 'Copia de seguridad', 'Exportar, importar o borrar tus datos']
+    ['#datos', 'Copia de seguridad', 'Exportar, importar o borrar tus datos'],
+    ['#cuenta', 'Cuenta y seguridad', 'Sesión, contraseña y bloqueo con código']
   ];
   return [h('nav', {class: 'links'}, items.map(([href, t, d]) => h('a', {href}, t, h('span', null, d))))];
 }
@@ -760,16 +850,19 @@ function vistaAjustes() {
         h('input', {id: 'c-pctTR', name: 'pctTR', type: 'number', step: '1', min: '0', max: '100', value: String(Math.round(c.pctTR * 100))})),
       f('mesesColchon', 'Meses de colchón objetivo', {type: 'number', step: '1', min: '0'}),
       f('cuotaCoche', 'Cuota mensual del coche (€, 0 = ninguna)', {type: 'number', step: '0.01', inputmode: 'decimal'})),
+    h('label', {class: 'chk'}, h('input', {type: 'checkbox', name: 'preciosAuto', checked: c.preciosAuto}), 'Actualizar los precios de los fondos al abrir la app'),
     h('div', {class: 'btns'}, h('button', {class: 'btn pri', type: 'submit'}, 'Guardar reglas')));
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const e = form.elements;
     state.config = {
+      ...state.config,
       nombre: e.nombre.value.trim(),
       margen: Number(e.margen.value) || 0,
       pctTR: Math.min(100, Math.max(0, Number(e.pctTR.value) || 0)) / 100,
       mesesColchon: Number(e.mesesColchon.value) || 0,
-      cuotaCoche: Number(e.cuotaCoche.value) || 0
+      cuotaCoche: Number(e.cuotaCoche.value) || 0,
+      preciosAuto: e.preciosAuto.checked
     };
     save();
     render();
@@ -786,9 +879,9 @@ function vistaDatos() {
     try {
       const raw = JSON.parse(await f.text());
       const nuevo = normalize(raw);
-      const n = Object.keys(SCHEMAS).reduce((t, k) => t + nuevo[k].length, 0);
+      const n = totalFilas(nuevo);
       if (!n) { toast('El archivo no tiene datos reconocibles'); return; }
-      if (!confirm('Se sustituirán los datos de este dispositivo por los del archivo (' + n + ' filas). ¿Seguir?')) return;
+      if (!confirm('Se sustituirán tus datos actuales por los del archivo (' + n + ' filas). ¿Seguir?')) return;
       state = nuevo;
       save();
       location.hash = '#panel';
@@ -808,7 +901,7 @@ function vistaDatos() {
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   };
   const borrarTodo = () => {
-    if (!confirm('¿Borrar TODOS los datos de este dispositivo? Exporta antes una copia si la quieres conservar.')) return;
+    if (!confirm('¿Borrar TODOS tus datos? Exporta antes una copia si la quieres conservar.')) return;
     state = emptyState();
     save();
     render();
@@ -816,7 +909,7 @@ function vistaDatos() {
   };
   return [volver(), h('section', {class: 'card'},
     h('h2', null, 'Copia de seguridad'),
-    h('p', {class: 'note'}, 'Tus datos solo están en este dispositivo y navegador: no se suben a ningún sitio. Exporta una copia de vez en cuando y guárdala (por ejemplo en iCloud o Google Drive). Para pasar los datos a otro móvil, exporta aquí e importa allí.'),
+    h('p', {class: 'note'}, textoAlmacen()),
     h('div', {class: 'btns'},
       h('button', {class: 'btn pri', type: 'button', onclick: exportar}, 'Exportar (.json)'),
       h('button', {class: 'btn', type: 'button', onclick: () => file.click()}, 'Importar…'),
@@ -836,11 +929,22 @@ const VISTAS = {
   presupuesto: [vistaPresupuesto, 'mas'],
   historial: [vistaHistorial, 'mas'],
   ajustes: [vistaAjustes, 'mas'],
-  datos: [vistaDatos, 'mas']
+  datos: [vistaDatos, 'mas'],
+  cuenta: [() => vistaCuenta(), 'mas']
 };
 
 let ultimaVista = null;
 function render() {
+  const vista = document.getElementById('vista');
+  /* Pantallas de inicio de sesión, código, etc. (cuenta.js) */
+  if (window.pantallaCuenta) {
+    document.body.classList.add('sin-sesion');
+    document.getElementById('titulo').textContent = 'Mi Patrimonio';
+    vista.replaceChildren(...[window.pantallaCuenta()].flat(Infinity).filter(Boolean));
+    ultimaVista = null;
+    return;
+  }
+  document.body.classList.remove('sin-sesion');
   const nombre = (location.hash || '#panel').slice(1);
   const [fn, tab] = VISTAS[nombre] || VISTAS.panel;
   const titulo = state.config.nombre ? 'Finanzas de ' + state.config.nombre : 'Mi Patrimonio';
@@ -849,7 +953,6 @@ function render() {
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
-  const vista = document.getElementById('vista');
   vista.replaceChildren(...fn().flat().filter(Boolean));
   if (ultimaVista !== nombre) { window.scrollTo(0, 0); ultimaVista = nombre; }
 }
@@ -858,10 +961,7 @@ window.addEventListener('hashchange', render);
 let anchoPrevio = window.innerWidth;
 window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - anchoPrevio) > 40) { anchoPrevio = window.innerWidth; render(); } });
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
-/* Si otra pestaña cambia los datos, recargarlos. */
-window.addEventListener('storage', (e) => { if (e.key === KEY) { state = load(); render(); } });
-
-render();
+/* El arranque (sesión, código, carga de datos) está en cuenta.js. */
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });

@@ -1,0 +1,11 @@
+[
+  {"isin": "IE00BYX5MX67", "moneda": "EUR", "nombre": "Fidelity S&P 500 Index Fund P-ACC-EUR"},
+  {"isin": "LU2349459045", "moneda": "EUR", "nombre": "Goldman Sachs Global Enhanced Index Sustainable Equity I Cap EUR"},
+  {"isin": "IE0007471471", "moneda": "EUR", "nombre": "Vanguard US Government Bond Index Fund EUR Hedged"},
+  {"isin": "IE00BYWYCC39", "moneda": "EUR", "nombre": "iShares Emerging Markets Index Fund (IE) D Acc EUR"},
+  {"isin": "IE00B246KL88", "moneda": "EUR", "nombre": "Vanguard 20+ Year Euro Treasury Index Fund"},
+  {"isin": "IE00BYX5N771", "moneda": "EUR", "nombre": "Fidelity MSCI Japan Index Fund P-ACC-EUR"},
+  {"isin": "IE00BYX5MD61", "moneda": "EUR", "nombre": "Fidelity MSCI Europe Index Fund P-ACC-EUR"},
+  {"isin": "IE00B1G3DH73", "moneda": "EUR", "nombre": "Vanguard US Equity Index Fund EUR Hedged"},
+  {"isin": "IE00BDZVHT63", "moneda": "USD", "nombre": "Fidelity MSCI Pacific ex-Japan Index Fund P-ACC-USD"}
+]
