@@ -5,8 +5,8 @@
  *     - anon / public key     → supabaseAnonKey   (es pública: la protección la ponen las reglas de la base de datos)
  * Mientras estén vacíos, la app funciona sin cuenta, guardando solo en este dispositivo. */
 window.PATRIMONIO_CONFIG = {
-  supabaseUrl: 'https://abcdefghijk.supabase.co',
-  supabaseAnonKey: 'eyJhbGciOi...tu-clave-entera...',
+  supabaseUrl: 'https://zetgviysixxsieaelezq.supabase.co',
+  supabaseAnonKey: 'sb_publishable_6QU8RYQtejSq0g-h6faFPg_PleTwKFZ',
   // Muestra «Crear una cuenta» en la pantalla de inicio. El registro de verdad se abre o cierra en
   // Supabase → Authentication → Sign In / Providers → «Allow new users to sign up».
   registroAbierto: true
