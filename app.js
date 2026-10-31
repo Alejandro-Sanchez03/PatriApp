@@ -614,18 +614,27 @@ function editRow(tabla, id, inicial) {
       h('button', {class: 'btn-txt fuerte', type: 'submit'}, 'Guardar')),
     datalists(),
     h('div', {class: 'form'}, h('div', {class: 'row'}, sch.cols.map((c) => campo(c, datos[c.k])))),
+    tabla === 'movimientos' && !fila ? h('label', {class: 'chk'}, h('input', {type: 'checkbox', name: 'mover', checked: true}),
+      'Mover el dinero en mis saldos (sale de la cuenta corriente; si va a la cartera, se reparte entre los fondos)') : null,
     sch.ayuda ? h('p', {class: 'note'}, sch.ayuda) : null,
     fila ? h('button', {class: 'btn pel ancho', type: 'button', onclick: () => borrar(tabla, id)}, 'Borrar') : null].filter(Boolean));
   form.onsubmit = (ev) => {
     ev.preventDefault();
     if (!form.reportValidity()) return;
     const o = leerForm(form, sch.cols);
+    let aviso = 'Guardado';
     if (fila) Object.assign(fila, o);
-    else state[tabla].push({id: newId(), ...o});
+    else {
+      state[tabla].push({id: newId(), ...o});
+      if (tabla === 'movimientos' && form.elements.mover && form.elements.mover.checked) {
+        const d = aplicarTransferencia(o);
+        if (d) aviso = 'Transferencia apuntada: ' + d;
+      }
+    }
     save();
     dlg.close();
     render();
-    toast('Guardado');
+    toast(aviso);
   };
   abrirHoja();
   // En el móvil, el primer campo vacío recibe el foco para escribir enseguida.
@@ -802,6 +811,12 @@ function vistaInversion() {
       h('div', {class: 'kpi'}, h('span', {class: 'kpi-lbl'}, 'Valor fondos'), h('span', {class: 'kpi-num'}, eur0.format(res.fondos))),
       h('div', {class: 'kpi'}, h('span', {class: 'kpi-lbl'}, 'Aportado'), h('span', {class: 'kpi-num'}, eur0.format(res.invertido))),
       h('div', {class: 'kpi'}, h('span', {class: 'kpi-lbl'}, 'Por invertir'), h('span', {class: 'kpi-num'}, eur0.format(porInvertir)))));
+    const estimada = st.config.carteraEstimadaDesde;
+    out.push(h('a', {class: 'aviso-fila', href: '#ajustar-cartera'},
+      icono(estimada ? 'reloj' : 'check', estimada ? 'warn' : 'ok'),
+      h('span', null, estimada ? 'Participaciones estimadas desde el ' + fechaCorta(estimada) : st.config.carteraAjustada ? 'Ajustada con MyInvestor el ' + fechaCorta(st.config.carteraAjustada) : 'Ajustar con los datos de MyInvestor',
+        h('span', {class: 'e-bloque'}, estimada ? 'Toca para ajustar con los datos reales de MyInvestor' : 'Valor total o participaciones de cada fondo')),
+      icono('chevron', 'chev')));
     out.push(carteraCard(res));
   } else {
     out.push(h('section', {class: 'card'}, h('p', {class: 'empty'}, 'Añade tus fondos con su ISIN y participaciones.'), h('button', {class: 'btn pri', type: 'button', onclick: () => editRow('cartera', null)}, 'Añadir fondo')));
@@ -870,9 +885,7 @@ function aplicarPrecios(datos) {
   }
   if (cambiados) {
     // El saldo de la cuenta de la cartera pasa a ser el valor total de los fondos.
-    const inv = state.saldos.filter((r) => r.grupo === 'Inversión');
-    const cuenta = inv.find((r) => /^cartera indexada$/i.test(r.cuenta.trim())) || inv.find((r) => !/por invertir/i.test(r.cuenta));
-    if (cuenta) cuenta.saldo = round2(sum(state.cartera, (r) => r.valor));
+    sincronizarSaldoCartera();
     fotoSaldos(hoy());
     save();
   }
@@ -1072,6 +1085,7 @@ const VISTAS = {
   cuenta: [() => vistaCuenta(), 'ajustes', 'Cuenta'],
   fire: [() => vistaFire(), 'panel', 'Objetivo FIRE'],
   importar: [() => vistaImportar(), 'gastos', 'Importar'],
+  'ajustar-cartera': [() => vistaAjustarCartera(), 'inversion', 'Ajustar cartera'],
   // direcciones antiguas
   cartera: [vistaInversion, 'inversion', 'Inversión'],
   mas: [vistaAjustes, 'ajustes', 'Ajustes']
@@ -1098,7 +1112,7 @@ function render() {
   const correo = typeof usuario !== 'undefined' && usuario ? usuario.email : '';
   document.getElementById('avatar').textContent = ((nombreUsuario || correo || 'P').trim()[0] || 'P').toUpperCase();
   const fab = document.getElementById('fab');
-  fab.hidden = !(tab === 'panel' || tab === 'gastos') || ['presupuesto', 'importar', 'fire'].includes(nombre);
+  fab.hidden = !(tab === 'panel' || tab === 'gastos') || ['presupuesto', 'importar', 'fire', 'nominas'].includes(nombre);
   document.querySelectorAll('.tabs [data-ico]').forEach((el) => { if (!el.firstChild) el.append(icono(el.dataset.ico)); });
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');

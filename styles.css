@@ -384,3 +384,8 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 .fila-imp-mov.apagada { opacity: .42; }
 .imp-chk { display: grid; place-items: center; padding: 4px; cursor: pointer; }
 .cat-input { padding: 6px 9px !important; font-size: 14px !important; border-radius: 9px !important; margin-top: 4px; max-width: 14rem; }
+
+/* ── Ajustar cartera ── */
+.e-bloque { display: block; font-size: .78rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.ajuste-fondo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; padding: 12px 0; }
+.ajuste-fondo > .multilinea { grid-column: 1 / -1; font-weight: 600; line-height: 1.3; }

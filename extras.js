@@ -329,3 +329,121 @@ function vistaImportar() {
         return li;
       })))];
 }
+
+/* ───────────────────────── Transferencias y cartera estimada ───────────────────────── */
+
+/* Cuenta de saldos que representa el valor de los fondos. */
+function cuentaCartera() {
+  const inv = state.saldos.filter((r) => r.grupo === 'Inversión');
+  return inv.find((r) => /^cartera indexada$/i.test(r.cuenta.trim())) || inv.find((r) => !/por invertir/i.test(r.cuenta)) || null;
+}
+function sincronizarSaldoCartera() {
+  const c = cuentaCartera();
+  if (c && state.cartera.length) c.saldo = round2(sum(state.cartera, (r) => r.valor));
+}
+
+/* Reparte una aportación entre los fondos según su peso actual (como hace la cartera gestionada). */
+function repartirEnFondos(importe) {
+  const fondos = state.cartera.filter((f) => f.valor > 0 && f.participaciones > 0);
+  const total = sum(fondos, (f) => f.valor);
+  if (!total) return false;
+  for (const f of fondos) {
+    const parte = importe * f.valor / total;
+    const precio = f.valor / f.participaciones;          // € por participación
+    f.participaciones = Math.round((f.participaciones + parte / precio) * 1e4) / 1e4;
+    f.valor = round2(f.valor + parte);
+    f.invertido = round2(f.invertido + parte);
+  }
+  if (!state.config.carteraEstimadaDesde) state.config.carteraEstimadaDesde = hoy();
+  return true;
+}
+
+/* Mueve el dinero de una transferencia: sale de la cuenta corriente y entra en el destino. */
+function aplicarTransferencia(m) {
+  const x = Number(m.importe) || 0;
+  if (x <= 0) return '';
+  const origen = state.saldos.find((r) => r.grupo === 'Liquidez');
+  if (origen) origen.saldo = round2(origen.saldo - x);
+  let destino = '';
+  if (m.destino === DESTINOS[1]) {
+    if (repartirEnFondos(x)) { sincronizarSaldoCartera(); destino = 'repartido entre tus fondos'; }
+    else { const c = cuentaCartera(); if (c) { c.saldo = round2(c.saldo + x); destino = 'sumado a ' + c.cuenta; } }
+  } else {
+    const grupo = m.destino === DESTINOS[0] ? 'Cuenta remunerada' : m.destino === 'Fondo de emergencia' ? 'Fondo de emergencia' : null;
+    const c = grupo && state.saldos.find((r) => r.grupo === grupo);
+    if (c) { c.saldo = round2(c.saldo + x); destino = 'sumado a ' + (c.entidad || c.cuenta); }
+  }
+  fotoSaldos(hoy());
+  return destino;
+}
+
+/* Pantalla para corregir la cartera con los datos reales de MyInvestor. */
+let modoAjuste = 'total';
+function vistaAjustarCartera() {
+  const fondos = state.cartera.slice().sort((a, b) => b.valor - a.valor);
+  const res = calcResumen(state);
+  const porInv = state.saldos.find((r) => r.grupo === 'Inversión' && /por invertir/i.test(r.cuenta));
+  const terminar = (msg) => {
+    delete state.config.carteraEstimadaDesde;
+    state.config.carteraAjustada = hoy();
+    sincronizarSaldoCartera();
+    fotoSaldos(hoy());
+    save();
+    location.hash = '#inversion';
+    toast(msg);
+  };
+  const opcion = (k, t) => h('button', {class: 'seg' + (modoAjuste === k ? ' activo' : ''), type: 'button', onclick: () => { modoAjuste = k; render(); }}, t);
+  const out = [volver('#inversion', 'Inversión'),
+    h('section', {class: 'card'},
+      h('h2', null, 'Ajustar con MyInvestor'),
+      h('p', {class: 'note'}, 'Copia los datos de la app de MyInvestor. Lo más rápido es el valor total; si quieres el detalle exacto, pon las participaciones de cada fondo.'),
+      h('div', {class: 'segmentos', style: 'grid-template-columns:1fr 1fr'}, opcion('total', 'Valor total'), opcion('fondos', 'Por fondo')))];
+
+  if (modoAjuste === 'total') {
+    const total = h('input', {type: 'number', step: '0.01', inputmode: 'decimal', id: 'aj-total', value: String(round2(res.fondos)), required: true});
+    const efectivo = porInv ? h('input', {type: 'number', step: '0.01', inputmode: 'decimal', id: 'aj-efe', value: String(porInv.saldo)}) : null;
+    const form = h('form', {class: 'form'},
+      h('label', {class: 'f', for: 'aj-total'}, 'Valor de los fondos según MyInvestor (€)', total),
+      efectivo ? h('label', {class: 'f', for: 'aj-efe'}, 'Efectivo por invertir (€)', efectivo) : null,
+      h('button', {class: 'btn pri ancho', type: 'submit'}, 'Ajustar'));
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const nuevo = coerce({t: 'money'}, total.value), antes = res.fondos;
+      if (!(nuevo > 0) || !antes) return toast('Pon un valor mayor que 0');
+      const k = nuevo / antes;
+      // Mismo reparto entre fondos; cambia el número de participaciones en la misma proporción.
+      state.cartera.forEach((f) => { f.participaciones = Math.round(f.participaciones * k * 1e4) / 1e4; f.valor = round2(f.valor * k); });
+      // El redondeo de céntimos se ajusta en el fondo más grande para que el total cuadre exacto.
+      const mayor = state.cartera.reduce((m, f) => (f.valor > m.valor ? f : m), state.cartera[0]);
+      if (mayor) mayor.valor = round2(mayor.valor + nuevo - sum(state.cartera, (f) => f.valor));
+      if (efectivo && porInv) porInv.saldo = coerce({t: 'money'}, efectivo.value);
+      terminar('Cartera ajustada: ' + signed(nuevo - antes));
+    });
+    out.push(h('section', {class: 'card'}, form,
+      h('p', {class: 'note'}, 'Lo aportado no cambia. Si en MyInvestor ves el importe invertido de cada fondo, usa «Por fondo».')));
+  } else {
+    const filas = fondos.map((f) => ({f,
+      part: h('input', {type: 'number', step: 'any', inputmode: 'decimal', value: String(f.participaciones), 'aria-label': 'Participaciones de ' + f.fondo}),
+      inv: h('input', {type: 'number', step: '0.01', inputmode: 'decimal', value: String(f.invertido), 'aria-label': 'Invertido en ' + f.fondo})}));
+    const form = h('form', {class: 'form'},
+      h('ul', {class: 'lista'}, filas.map(({f, part, inv}) => h('li', {class: 'ajuste-fondo'},
+        h('span', {class: 'multilinea'}, f.fondo),
+        h('label', {class: 'f'}, 'Participaciones', part),
+        h('label', {class: 'f'}, 'Invertido (€)', inv)))),
+      h('button', {class: 'btn pri ancho', type: 'submit'}, 'Guardar'));
+    form.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const antes = res.fondos;
+      for (const {f, part, inv} of filas) {
+        const p = coerce({t: 'number'}, part.value);
+        const precio = f.participaciones > 0 ? f.valor / f.participaciones : 0;
+        if (p >= 0 && precio) { f.valor = round2(p * precio); f.participaciones = p; }
+        const i = coerce({t: 'money'}, inv.value);
+        if (i >= 0) f.invertido = i;
+      }
+      terminar('Cartera ajustada: ' + signed(sum(state.cartera, (r) => r.valor) - antes));
+    });
+    out.push(h('section', {class: 'card'}, form));
+  }
+  return out;
+}
