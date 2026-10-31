@@ -8,7 +8,17 @@
 const KEY = 'patrimonio-v1';
 
 const GRUPOS = ['Liquidez', 'Efectivo', 'Apartado para el coche', 'Fondo de emergencia', 'Cuenta remunerada', 'Inversión', 'Otros'];
-const DESTINOS = ['Trade Republic', 'Cartera indexada (MyInvestor)', 'Fondo de emergencia', 'Otro'];
+/* Destinos de las transferencias: salen de tus propias cuentas (cuenta remunerada y cartera). */
+const DESTINOS_FIJOS = ['Fondo de emergencia', 'Otro'];
+function destinos() {
+  const rem = state.saldos.find((r) => r.grupo === 'Cuenta remunerada');
+  const inv = (typeof cuentaCartera === 'function' && cuentaCartera()) || state.saldos.find((r) => r.grupo === 'Inversión');
+  return [
+    rem ? (rem.entidad || rem.cuenta) : 'Cuenta remunerada',
+    inv ? inv.cuenta + (inv.entidad ? ' (' + inv.entidad + ')' : '') : 'Cartera de inversión',
+    ...DESTINOS_FIJOS
+  ];
+}
 const TIPOS_FONDO = ['Renta variable', 'Renta fija'];
 
 const DEFAULT_CONFIG = {
@@ -66,7 +76,7 @@ const SCHEMAS = {
     cols: [
       {k: 'fecha', l: 'Fecha', t: 'date', req: true},
       {k: 'mes_nomina', l: 'Nómina', t: 'month', req: true},
-      {k: 'destino', l: 'Destino', t: 'select', opts: DESTINOS},
+      {k: 'destino', l: 'Destino', t: 'select', opts: () => destinos()},
       {k: 'importe', l: 'Importe', t: 'money', req: true}
     ]
   },
@@ -95,6 +105,19 @@ const SCHEMAS = {
       {k: 'fecha_vl', l: 'Fecha del precio', t: 'date'},
       {k: 'invertido', l: 'Invertido', t: 'money', req: true},
       {k: 'valor', l: 'Valor', t: 'money', req: true}
+    ]
+  },
+  recurrentes: {
+    titulo: 'Gastos recurrentes', nuevo: 'Nuevo recurrente',
+    ayuda: 'Se apuntan solos cada mes el día indicado. Si luego importas los movimientos del banco, se detectan y no se duplican.',
+    inicial: () => ({activo: true, dia: new Date().getDate()}),
+    cols: [
+      {k: 'concepto', l: 'Concepto', t: 'text', req: true},
+      {k: 'categoria', l: 'Categoría', t: 'text', list: 'categorias', req: true},
+      {k: 'importe', l: 'Importe', t: 'money', req: true},
+      {k: 'dia', l: 'Día del mes', t: 'number', req: true},
+      {k: 'activo', l: 'Activo', t: 'bool'},
+      {k: 'ultimo', l: 'Último mes apuntado', t: 'month', oculto: true}
     ]
   },
   historial: {
@@ -301,7 +324,7 @@ function calcReparto(st, mesGastos) {
   const idx = Math.floor((sobra - tr) / 10) * 10;
   const fila = (destino, importe, h) => ({destino, importe, hecho: h, pendiente: Math.max(0, importe - h)});
   const cerrada = st.ingresos.some((r) => r.mes === nomina && r.cerrada);
-  const [d1, d2] = DESTINOS;
+  const [d1, d2] = destinos();
   const rows = cerrada
     ? [fila(d1, hecho(d1), hecho(d1)), fila(d2, hecho(d2), hecho(d2)), {destino: 'Se queda en la cuenta corriente', importe: corrienteHoy, otra: true}]
     : [fila(d1, tr, hecho(d1)), fila(d2, idx, hecho(d2)), {destino: 'Se queda en la cuenta corriente', importe: corriente - tr - idx, otra: true}];
@@ -376,9 +399,9 @@ function vistaPanel() {
   if (!st.saldos.length && !st.gastos.length) {
     out.push(h('section', {class: 'card bienvenida'},
       h('h2', null, 'Bienvenido a PatriApp'),
-      h('p', {class: 'note'}, 'Empieza añadiendo tus cuentas o importa una copia de seguridad.'),
+      h('p', {class: 'note'}, 'Configúrala en un minuto o importa una copia de seguridad.'),
       h('div', {class: 'btns'},
-        h('a', {class: 'btn pri', href: '#saldos'}, 'Añadir cuentas'),
+        h('a', {class: 'btn pri', href: '#bienvenida'}, 'Empezar'),
         h('a', {class: 'btn', href: '#datos'}, 'Importar datos'))));
   }
 
@@ -428,6 +451,9 @@ function vistaPanel() {
     kpi('Invertido', eur0.format(res.inversion + ahorro), 'inversion', '#76e78e', '#inversion'),
     kpi('Colchón', col.gastoMes ? col.meses.toLocaleString('es-ES', {maximumFractionDigits: 1}) + ' meses' : '—', 'escudo', '#fbbf24', '#saldos')));
 
+  // Avisos
+  out.push(tarjetaAvisos());
+
   // Objetivo FIRE
   if (st.saldos.length) out.push(tarjetaFire());
 
@@ -443,6 +469,9 @@ function vistaPanel() {
     gm.previsto ? h('span', {class: 'track'}, h('span', {class: 'fill', style: `width:${Math.min(100, Math.max(0, gm.gastado) / gm.previsto * 100)}%;background:${gm.gastado > gm.previsto ? css('--bad') : css('--accent')}`})) : null,
     top.length ? h('div', {class: 'mini-cats'}, top.map((r) => h('span', {class: 'mini-cat'}, avatarCategoria(r.concepto), h('span', null, r.concepto), h('b', null, eur0.format(r.gastado))))) : null));
 
+  // Ahorro del último mes con nómina
+  out.push(tarjetaAhorro());
+
   // Nómina
   if (rep && !rep.cerrada) {
     const c = st.config;
@@ -453,7 +482,7 @@ function vistaPanel() {
         avatarGrupo(i === 0 ? 'Cuenta remunerada' : 'Inversión'),
         h('span', {class: 'fila-txt'}, h('span', null, x.destino), h('span', {class: 'e ' + (x.pendiente > 0 ? '' : 'ok')}, x.pendiente > 0 ? 'Pendiente ' + eur2.format(x.pendiente) : 'Hecho')),
         h('span', {class: 'fila-imp'}, eur2.format(x.importe))))),
-      h('button', {class: 'btn ancho', type: 'button', onclick: () => editRow('movimientos', null, {fecha: hoy(), mes_nomina: rep.nomina, destino: DESTINOS[0]})}, 'Apuntar transferencia')));
+      h('button', {class: 'btn ancho', type: 'button', onclick: () => editRow('movimientos', null, {fecha: hoy(), mes_nomina: rep.nomina, destino: destinos()[0]})}, 'Apuntar transferencia')));
   } else if (rep) {
     out.push(h('a', {class: 'aviso-fila', href: '#nominas'}, icono('check', 'ok'), 'Nómina de ' + mesNombre(rep.nomina) + ' repartida', icono('chevron', 'chev')));
   }
@@ -570,7 +599,8 @@ function campo(col, valor) {
   if (col.t === 'bool') return h('label', {class: 'chk'}, h('input', {type: 'checkbox', name: col.k, id, checked: !!valor}), col.l);
   let input;
   if (col.t === 'select') {
-    const opts = col.opts.includes(valor) || !valor ? col.opts : [valor, ...col.opts];
+    const base = typeof col.opts === 'function' ? col.opts() : col.opts;
+    const opts = base.includes(valor) || !valor ? base : [valor, ...base];
     input = h('select', {name: col.k, id}, opts.map((o) => h('option', {value: o, selected: o === valor}, o)));
   } else {
     const type = {money: 'number', number: 'number', date: 'date', month: 'month'}[col.t] || 'text';
@@ -589,6 +619,7 @@ function leerForm(form, cols) {
   const o = {};
   for (const c of cols) {
     const el = form.elements[c.k];
+    if (!el) continue;   // campos internos que no salen en el formulario
     o[c.k] = coerce(c, c.t === 'bool' ? el.checked : el.value);
   }
   return o;
@@ -602,7 +633,7 @@ function datalists() {
 function editRow(tabla, id, inicial) {
   const sch = SCHEMAS[tabla];
   const fila = id ? state[tabla].find((r) => r.id === id) : null;
-  const datos = fila || inicial || {};
+  const datos = fila || inicial || (sch.inicial ? sch.inicial() : {});
   const dlg = document.getElementById('dialogo');
   const form = document.getElementById('dialogo-form');
   dlg.onclose = null;
@@ -613,7 +644,7 @@ function editRow(tabla, id, inicial) {
       h('h3', null, fila ? 'Editar' : sch.nuevo),
       h('button', {class: 'btn-txt fuerte', type: 'submit'}, 'Guardar')),
     datalists(),
-    h('div', {class: 'form'}, h('div', {class: 'row'}, sch.cols.map((c) => campo(c, datos[c.k])))),
+    h('div', {class: 'form'}, h('div', {class: 'row'}, sch.cols.filter((c) => !c.oculto).map((c) => campo(c, datos[c.k])))),
     tabla === 'movimientos' && !fila ? h('label', {class: 'chk'}, h('input', {type: 'checkbox', name: 'mover', checked: true}),
       'Mover el dinero en mis saldos (sale de la cuenta corriente; si va a la cartera, se reparte entre los fondos)') : null,
     sch.ayuda ? h('p', {class: 'note'}, sch.ayuda) : null,
@@ -625,6 +656,7 @@ function editRow(tabla, id, inicial) {
     let aviso = 'Guardado';
     if (fila) Object.assign(fila, o);
     else {
+      if (tabla === 'recurrentes') o.ultimo = primerMesRecurrente(o);
       state[tabla].push({id: newId(), ...o});
       if (tabla === 'movimientos' && form.elements.mover && form.elements.mover.checked) {
         const d = aplicarTransferencia(o);
@@ -652,7 +684,7 @@ async function borrar(tabla, id) {
 /* Lista de filas de una tabla: se toca una para editarla. */
 function tablaEditable(tabla, {orden, limite, cols, titulo} = {}) {
   const sch = SCHEMAS[tabla];
-  const visibles = cols ? sch.cols.filter((c) => cols.includes(c.k)) : sch.cols;
+  const visibles = (cols ? sch.cols.filter((c) => cols.includes(c.k)) : sch.cols).filter((c) => !c.oculto);
   let rows = state[tabla].slice();
   if (orden) rows.sort(orden);
   const total = rows.length;
@@ -679,6 +711,16 @@ function tablaEditable(tabla, {orden, limite, cols, titulo} = {}) {
 /* ───────────────────────── Vista: Gastos (por meses) ───────────────────────── */
 
 let mesGastosSel = null;
+let busquedaGastos = '';
+let filtroCategoria = null;
+
+/* Fila de un gasto en una lista. */
+function filaGasto(g, conMes) {
+  return h('li', null, h('button', {class: 'fila', type: 'button', onclick: () => editRow('gastos', g.id)},
+    avatarCategoria(g.categoria),
+    h('span', {class: 'fila-txt'}, h('span', null, g.concepto), h('span', {class: 'e'}, g.categoria + ' · ' + (conMes ? fechaLarga(g.fecha) : fechaCorta(g.fecha)))),
+    h('span', {class: 'fila-imp ' + (g.importe < 0 ? 'ok' : '')}, (g.importe < 0 ? '+' : '−') + eur2.format(Math.abs(g.importe)))));
+}
 
 function mesesDisponibles() {
   const set = new Set([hoy().slice(0, 7)]);
@@ -713,34 +755,56 @@ function vistaGastos() {
         h('span', {class: 'heroe-sub'}, restante >= 0 ? ['Te quedan ', h('b', null, eur0.format(restante)), ' de ' + eur0.format(gm.previsto)] : h('span', {class: 'bad'}, 'Te has pasado ' + eur0.format(-restante) + ' de ' + eur0.format(gm.previsto)))]
       : h('span', {class: 'heroe-sub'}, delMes.length + ' movimientos · ', h('a', {href: '#presupuesto'}, 'poner presupuesto'))));
 
+  out.push(h('div', {class: 'accesos'},
+    h('a', {class: 'acceso-btn', href: '#resumen'}, h('span', {class: 'avatar sm', style: '--c:#76e78e'}, icono('hucha')), 'Ahorro'),
+    h('a', {class: 'acceso-btn', href: '#recurrentes'}, h('span', {class: 'avatar sm', style: '--c:#22d3ee'}, icono('repetir')), 'Fijos'),
+    h('a', {class: 'acceso-btn', href: '#presupuesto'}, h('span', {class: 'avatar sm', style: '--c:#f472b6'}, icono('tarta')), 'Presupuesto'),
+    h('a', {class: 'acceso-btn', href: '#importar'}, h('span', {class: 'avatar sm', style: '--c:#7aa2ff'}, icono('banco')), 'Importar')));
+
   if (gm.rows.length) {
     const rows = gm.rows.slice().sort((a, b) => b.gastado - a.gastado || b.previsto - a.previsto);
     const max = Math.max(1, ...rows.map((x) => Math.max(x.previsto, x.gastado)));
     out.push(h('section', {class: 'card'},
-      h('div', {class: 'card-cab'}, h('h2', null, 'Por categoría'), h('a', {class: 'btn-txt', href: '#presupuesto'}, 'Presupuesto')),
+      h('div', {class: 'card-cab'}, h('h2', null, 'Por categoría'), h('span', {class: 'sub'}, 'Toca para filtrar')),
       h('ul', {class: 'lista'}, rows.map((x) => {
         const color = estiloCategoria(x.concepto).color;
         const pasa = x.previsto > 0 && x.gastado > x.previsto;
-        return h('li', {class: 'fila fila-cat'},
+        return h('li', null, h('button', {class: 'fila fila-cat' + (filtroCategoria === x.concepto ? ' sel' : ''), type: 'button', onclick: () => { filtroCategoria = filtroCategoria === x.concepto ? null : x.concepto; render(); }},
           avatarCategoria(x.concepto),
           h('span', {class: 'fila-txt'},
             h('span', null, x.concepto),
             h('span', {class: 'track'},
               x.previsto ? h('span', {class: 'fill', style: `width:${x.previsto / max * 100}%;background:${color};opacity:.25`}) : null,
               h('span', {class: 'fill', style: `width:${Math.max(0, x.gastado) / max * 100}%;background:${pasa ? css('--bad') : color}`}))),
-          h('span', {class: 'fila-imp'}, h('span', {class: x.gastado < 0 ? 'ok' : pasa ? 'bad' : ''}, eur2.format(x.gastado)), x.previsto ? h('span', {class: 'e'}, 'de ' + eur0.format(x.previsto)) : null));
+          h('span', {class: 'fila-imp'}, h('span', {class: x.gastado < 0 ? 'ok' : pasa ? 'bad' : ''}, eur2.format(x.gastado)), x.previsto ? h('span', {class: 'e'}, 'de ' + eur0.format(x.previsto)) : null)));
       }))));
   }
 
+  // Movimientos: del mes (con filtro de categoría) o resultados de búsqueda en todos los meses
+  const contenedor = h('div');
+  const titulo = h('h2');
+  const pintarMovs = () => {
+    const q = sinTildes(busquedaGastos.trim());
+    let lista, vacio;
+    if (q) {
+      lista = st.gastos.filter((g) => sinTildes(g.concepto + ' ' + g.categoria).includes(q)).sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+      titulo.textContent = lista.length + ' resultados · ' + eur2.format(sum(lista, (g) => g.importe));
+      vacio = 'Nada coincide con «' + busquedaGastos.trim() + '».';
+    } else {
+      lista = filtroCategoria ? delMes.filter((g) => g.categoria === filtroCategoria) : delMes;
+      titulo.textContent = 'Movimientos · ' + lista.length;
+      vacio = 'No hay gastos en ' + mesNombre(sel) + '. Pulsa + para añadir uno.';
+    }
+    contenedor.replaceChildren(lista.length ? h('ul', {class: 'lista'}, lista.slice(0, 200).map((g) => filaGasto(g, !!q))) : h('p', {class: 'empty'}, vacio));
+  };
+  const buscador = h('input', {type: 'search', class: 'buscador', placeholder: 'Buscar en todos los meses', value: busquedaGastos, 'aria-label': 'Buscar gastos', autocomplete: 'off'});
+  buscador.addEventListener('input', () => { busquedaGastos = buscador.value; pintarMovs(); });
+  pintarMovs();
   out.push(h('section', {class: 'card'},
-    h('div', {class: 'card-cab'}, h('h2', null, 'Movimientos · ' + delMes.length), h('a', {class: 'btn-txt', href: '#importar'}, icono('copia'), 'Importar del banco')),
-    delMes.length
-      ? h('ul', {class: 'lista'}, delMes.map((g) => h('li', null,
-        h('button', {class: 'fila', type: 'button', onclick: () => editRow('gastos', g.id)},
-          avatarCategoria(g.categoria),
-          h('span', {class: 'fila-txt'}, h('span', null, g.concepto), h('span', {class: 'e'}, g.categoria + ' · ' + fechaCorta(g.fecha))),
-          h('span', {class: 'fila-imp ' + (g.importe < 0 ? 'ok' : '')}, (g.importe < 0 ? '+' : '−') + eur2.format(Math.abs(g.importe)))))))
-      : h('p', {class: 'empty'}, 'No hay gastos en ' + mesNombre(sel) + '. Pulsa + para añadir uno.')));
+    h('div', {class: 'card-cab'}, titulo),
+    buscador,
+    filtroCategoria && !busquedaGastos.trim() ? h('button', {class: 'chip-filtro', type: 'button', onclick: () => { filtroCategoria = null; render(); }}, avatarCategoria(filtroCategoria), filtroCategoria, h('span', {'aria-hidden': 'true'}, ' ✕')) : null,
+    contenedor));
 
   const ultimos = meses.filter((m) => m <= hoy().slice(0, 7)).slice(-6);
   if (ultimos.length > 1) {
@@ -818,6 +882,7 @@ function vistaInversion() {
         h('span', {class: 'e-bloque'}, estimada ? 'Toca para ajustar con los datos reales de MyInvestor' : 'Valor total o participaciones de cada fondo')),
       icono('chevron', 'chev')));
     out.push(carteraCard(res));
+    out.push(tarjetaImpuestos(res));
   } else {
     out.push(h('section', {class: 'card'}, h('p', {class: 'empty'}, 'Añade tus fondos con su ISIN y participaciones.'), h('button', {class: 'btn pri', type: 'button', onclick: () => editRow('cartera', null)}, 'Añadir fondo')));
   }
@@ -829,7 +894,7 @@ function vistaInversion() {
   out.push(h('h2', {class: 'seccion'}, avatarGrupo('Cuenta remunerada'), nombreRem));
   if (rem.length) {
     const tae = st.config.interesTR;
-    const aportado = sum(st.movimientos.filter((m) => m.destino === DESTINOS[0]), (m) => m.importe);
+    const aportado = sum(st.movimientos.filter((m) => m.destino === destinos()[0]), (m) => m.importe);
     out.push(h('section', {class: 'card'},
       h('span', {class: 'heroe-lbl'}, 'Saldo'),
       h('span', {class: 'num-m'}, eur2.format(ahorro)),
@@ -978,10 +1043,13 @@ function vistaAjustes() {
       filaAjuste('#fire', 'inversion', '#76e78e', 'Objetivo FIRE', 'Cuánto necesitas y cuándo llegas'),
       filaAjuste('#nominas', 'documento', '#7aa2ff', 'Nóminas y transferencias'),
       filaAjuste('#presupuesto', 'tarta', '#f472b6', 'Presupuesto'),
+      filaAjuste('#recurrentes', 'repetir', '#22d3ee', 'Gastos recurrentes', 'Se apuntan solos cada mes'),
+      filaAjuste('#resumen', 'hucha', '#76e78e', 'Resumen del mes', 'Ingresos, gastos y tasa de ahorro'),
       filaAjuste('#historial', 'reloj', '#fbbf24', 'Historial de saldos')),
     h('h3', {class: 'grupo-tit'}, 'Datos'),
     h('ul', {class: 'grupo'},
       filaAjuste('#importar', 'banco', '#7aa2ff', 'Importar del banco', 'Excel o CSV de BBVA u otro banco'),
+      filaAjuste('#versiones', 'reloj', '#fbbf24', 'Historial de versiones', 'Vuelve atrás si algo sale mal'),
       filaAjuste('#datos', 'copia', '#94a3b8', 'Copia de seguridad', 'Exportar, importar o borrar')),
     h('p', {class: 'pie'}, 'PatriApp')
   ];
@@ -1086,6 +1154,10 @@ const VISTAS = {
   fire: [() => vistaFire(), 'panel', 'Objetivo FIRE'],
   importar: [() => vistaImportar(), 'gastos', 'Importar'],
   'ajustar-cartera': [() => vistaAjustarCartera(), 'inversion', 'Ajustar cartera'],
+  resumen: [() => vistaResumen(), 'gastos', 'Resumen del mes'],
+  recurrentes: [() => vistaRecurrentes(), 'gastos', 'Recurrentes'],
+  bienvenida: [() => vistaBienvenida(), 'panel', 'Bienvenida'],
+  versiones: [() => vistaVersiones(), 'ajustes', 'Versiones'],
   // direcciones antiguas
   cartera: [vistaInversion, 'inversion', 'Inversión'],
   mas: [vistaAjustes, 'ajustes', 'Ajustes']
@@ -1112,7 +1184,7 @@ function render() {
   const correo = typeof usuario !== 'undefined' && usuario ? usuario.email : '';
   document.getElementById('avatar').textContent = ((nombreUsuario || correo || 'P').trim()[0] || 'P').toUpperCase();
   const fab = document.getElementById('fab');
-  fab.hidden = !(tab === 'panel' || tab === 'gastos') || ['presupuesto', 'importar', 'fire', 'nominas'].includes(nombre);
+  fab.hidden = !(tab === 'panel' || tab === 'gastos') || ['presupuesto', 'importar', 'fire', 'nominas', 'resumen', 'recurrentes', 'bienvenida'].includes(nombre);
   document.querySelectorAll('.tabs [data-ico]').forEach((el) => { if (!el.firstChild) el.append(icono(el.dataset.ico)); });
   document.querySelectorAll('.tabs a').forEach((a) => {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');

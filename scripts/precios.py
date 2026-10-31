@@ -18,6 +18,7 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 FONDOS = RAIZ / "fondos.json"
+CONFIG = RAIZ / "config.js"
 SALIDA = RAIZ / "precios.json"
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       "Accept-Language": "en-GB,en;q=0.9"}
@@ -72,8 +73,27 @@ def usd_a_eur():
     return float(datos["rates"]["EUR"]), datos.get("date")
 
 
+def isins_de_usuarios():
+    """ISIN que los usuarios de la app tienen en su cartera (tabla pública «isins» de Supabase, sin importes)."""
+    try:
+        cfg = CONFIG.read_text(encoding="utf-8")
+        url = re.search(r"supabaseUrl:\s*'([^']+)'", cfg).group(1).rstrip("/")
+        clave = re.search(r"supabaseAnonKey:\s*'([^']+)'", cfg).group(1)
+        req = urllib.request.Request(url + "/rest/v1/isins?select=isin,moneda", headers={"apikey": clave, **UA})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return [{"isin": f["isin"], "moneda": f.get("moneda") or "EUR"} for f in json.loads(r.read().decode())]
+    except Exception as e:  # noqa: BLE001 — sin Supabase o sin la tabla: solo fondos.json
+        print(f"(sin ISIN de usuarios: {e})")
+        return []
+
+
 def main():
     fondos = json.loads(FONDOS.read_text(encoding="utf-8"))
+    conocidos = {f["isin"].strip().upper() for f in fondos}
+    for f in isins_de_usuarios():
+        if f["isin"].upper() not in conocidos:
+            fondos.append(f)
+            conocidos.add(f["isin"].upper())
     previo = json.loads(SALIDA.read_text(encoding="utf-8")) if SALIDA.exists() else {}
     salida = {"actualizado": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
               "fondos": dict(previo.get("fondos", {})), "errores": []}

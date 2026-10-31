@@ -22,6 +22,8 @@ App web instalable (PWA) para seguir el patrimonio: saldos por cuenta, gastos, n
 6. En GitHub, abre `config.js` → lápiz ✏️ → pega los dos valores entre las comillas → **Commit changes**.
 7. Abre la app, **Crear una cuenta**, confirma el email y entra. La primera vez te ofrecerá subir los datos que ya tenías en ese dispositivo.
 
+**Actualización 8 (una vez):** en **SQL Editor → New query**, pega `supabase/actualizacion-v8.sql` y pulsa **Run**. Activa el historial de versiones en la nube, el botón «Eliminar mi cuenta» y la lista de ISIN (sin importes) para que la búsqueda de precios de los lunes encuentre también los fondos de los demás usuarios.
+
 **Para las demás personas:** que creen su cuenta desde la app. Cuando estéis todos, cierra el registro en **Authentication → Sign In / Providers → Allow new users to sign up** (desactivado) y pon `registroAbierto: false` en `config.js`. Para añadir a alguien después: **Authentication → Users → Invite user** (recibirá un email para elegir contraseña).
 
 **A tener en cuenta del plan gratis:** Supabase pausa los proyectos sin uso durante 7 días seguidos; si pasa, entra en supabase.com y pulsa **Restore**. Los emails (confirmación, recuperar contraseña) tienen un límite de unos pocos por hora.
@@ -58,6 +60,13 @@ Funciona sin conexión después de abrirla una vez.
 - **Si compras un fondo nuevo**, añádelo en la app (con su ISIN y participaciones) **y** en `fondos.json`.
 - Para lanzarlo a mano: pestaña **Actions → Actualizar precios de fondos → Run workflow**.
 - Si una semana falla, GitHub te avisa por correo y la app mantiene el último precio.
+
+## Funciones
+
+- **Inicio:** patrimonio con gráfico, avisos (presupuesto, saldos sin actualizar, cartera por ajustar, nómina sin repartir), objetivo FIRE y ahorro del mes.
+- **Gastos:** por meses, por categoría (toca una para filtrar), buscador en todos los meses, **recurrentes** que se apuntan solos, **resumen del mes** con la tasa de ahorro e **importación** del Excel o CSV del banco.
+- **Inversión:** fondos con precios automáticos, aportaciones repartidas entre los fondos, ajuste con MyInvestor e impuestos estimados si vendieras.
+- **Ajustes:** tema claro u oscuro, Face ID, código, reglas, **historial de versiones** (nube y dispositivo), copia de seguridad y eliminar cuenta.
 
 ## Cómo calcula
 

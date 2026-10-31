@@ -241,7 +241,9 @@ async function leerExtracto(archivo) {
       r.tipo = 'ingreso'; r.importe = round2(importe); r.incluir = false; r.nota = 'Ingreso: no es un gasto';
     }
     // ¿Ya apuntado? Misma fecha e importe.
-    if (r.tipo === 'gasto' && state.gastos.some((g) => g.fecha === fecha && Math.abs(Math.abs(g.importe) - Math.abs(r.importe)) < 0.005)) { r.incluir = false; r.nota = 'Ya lo tienes apuntado'; }
+    // ¿Ya apuntado? Mismo importe y fecha cercana (los recurrentes y el banco pueden ir con unos días de diferencia).
+    const dia = toDate(fecha).getTime();
+    if (r.tipo === 'gasto' && state.gastos.some((g) => Math.abs(g.importe - r.importe) < 0.005 && Math.abs(toDate(g.fecha).getTime() - dia) <= 5 * 864e5)) { r.incluir = false; r.nota = 'Ya lo tienes apuntado'; }
     if (r.tipo === 'nomina' && state.ingresos.some((n) => n.mes === fecha.slice(0, 7))) { r.incluir = false; r.nota = 'Ya tienes la nómina de ese mes'; }
     out.push(r);
   }
@@ -365,11 +367,11 @@ function aplicarTransferencia(m) {
   const origen = state.saldos.find((r) => r.grupo === 'Liquidez');
   if (origen) origen.saldo = round2(origen.saldo - x);
   let destino = '';
-  if (m.destino === DESTINOS[1]) {
+  if (m.destino === destinos()[1]) {
     if (repartirEnFondos(x)) { sincronizarSaldoCartera(); destino = 'repartido entre tus fondos'; }
     else { const c = cuentaCartera(); if (c) { c.saldo = round2(c.saldo + x); destino = 'sumado a ' + c.cuenta; } }
   } else {
-    const grupo = m.destino === DESTINOS[0] ? 'Cuenta remunerada' : m.destino === 'Fondo de emergencia' ? 'Fondo de emergencia' : null;
+    const grupo = m.destino === destinos()[0] ? 'Cuenta remunerada' : m.destino === 'Fondo de emergencia' ? 'Fondo de emergencia' : null;
     const c = grupo && state.saldos.find((r) => r.grupo === grupo);
     if (c) { c.saldo = round2(c.saldo + x); destino = 'sumado a ' + (c.entidad || c.cuenta); }
   }

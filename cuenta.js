@@ -393,10 +393,12 @@ function pantallaMigrar(local) {
     h('div', {class: 'btns'},
       h('button', {class: 'btn pri', type: 'button', onclick: async () => {
         state = local; persistirNube(); await subir();
+        ls.del(KEY);   // los datos ya están en la cuenta: se borra la copia antigua del dispositivo
         salirDePantalla(); toast('Datos guardados en tu cuenta'); tareasTrasCargar();
       }}, 'Sí, guardarlos en mi cuenta'),
       h('button', {class: 'btn', type: 'button', onclick: async () => {
         state = emptyState(); persistirNube(); await subir();
+        ls.del(KEY);
         salirDePantalla(); tareasTrasCargar();
       }}, 'No, empezar de cero')));
 }
@@ -442,7 +444,23 @@ async function cargarDatos() {
 }
 
 function tareasTrasCargar() {
+  const n = aplicarRecurrentes();
+  if (n) { save(); render(); toast(n === 1 ? 'Se ha apuntado 1 gasto recurrente' : 'Se han apuntado ' + n + ' gastos recurrentes'); }
+  guardarCopiaLocal();
+  publicarIsins();
   if (state.config.preciosAuto) actualizarPrecios(false);
+}
+
+/* Comparte solo los ISIN de los fondos (sin importes ni usuario) para que la búsqueda de los lunes encuentre sus precios. */
+let isinsPublicados = false;
+async function publicarIsins() {
+  if (isinsPublicados || !CONFIGURADO || !usuario) return;
+  const filas = state.cartera
+    .map((f) => ({isin: String(f.isin || '').trim().toUpperCase(), moneda: f.moneda === 'USD' ? 'USD' : 'EUR'}))
+    .filter((f) => /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(f.isin));
+  if (!filas.length) return;
+  isinsPublicados = true;
+  try { await sb.from('isins').upsert(filas, {onConflict: 'isin', ignoreDuplicates: true}); } catch (e) { /* tabla aún no creada: no pasa nada */ }
 }
 
 async function cerrarSesion({sinPreguntar} = {}) {
@@ -472,11 +490,13 @@ function vistaCuenta() {
   const cambiarPass = () => {
     const dlg = document.getElementById('dialogo');
     const form = document.getElementById('dialogo-form');
-    form.replaceChildren(h('h3', null, 'Cambiar contraseña'),
-      h('div', {class: 'form'}, campoPass('pass', 'Nueva contraseña (mínimo 8 caracteres)', true), campoPass('pass2', 'Repite la contraseña', true)),
-      h('div', {class: 'btns', style: 'margin-top:14px;justify-content:flex-end'},
-        h('button', {class: 'btn', type: 'button', onclick: () => dlg.close()}, 'Cancelar'),
-        h('button', {class: 'btn pri', type: 'submit'}, 'Guardar')));
+    dlg.onclose = null;
+    form.replaceChildren(h('div', {class: 'asa', 'aria-hidden': 'true'}),
+      h('div', {class: 'hoja-cab'},
+        h('button', {class: 'btn-txt', type: 'button', onclick: () => dlg.close()}, 'Cancelar'),
+        h('h3', null, 'Cambiar contraseña'),
+        h('button', {class: 'btn-txt fuerte', type: 'submit'}, 'Guardar')),
+      h('div', {class: 'form'}, campoPass('pass', 'Nueva contraseña (mínimo 8 caracteres)', true), campoPass('pass2', 'Repite la contraseña', true)));
     form.onsubmit = async (ev) => {
       ev.preventDefault();
       if (!form.reportValidity()) return;
@@ -488,7 +508,26 @@ function vistaCuenta() {
     };
     dlg.showModal();
   };
+  const hayAntiguos = !!ls.get(KEY);
+  const eliminarCuenta = async () => {
+    if (!(await confirmar('Se borrarán tu cuenta y todos tus datos de la nube. No se puede deshacer. Exporta antes una copia si la quieres conservar.', {titulo: '¿Eliminar tu cuenta?', aceptar: 'Eliminar mi cuenta', peligro: true}))) return;
+    if (!(await confirmar('Última confirmación: ' + usuario.email + ' dejará de existir.', {titulo: '¿Seguro?', aceptar: 'Sí, eliminar', peligro: true}))) return;
+    let error = null;
+    try { ({error} = await sb.rpc('eliminar_mi_cuenta')); } catch (e) { error = e; }
+    if (error) return toast(/function|does not exist|schema cache/i.test(error.message || '') ? 'Falta activar esta opción en Supabase (mira el README)' : traducirError(error));
+    await cerrarSesion({sinPreguntar: true});
+    ls.del(KEY);
+    try { localStorage.removeItem('patrimonio-copias'); } catch (e) { /* nada */ }
+    mostrar(pantallaLogin({texto: 'Tu cuenta se ha eliminado.', tipo: 'ok'}));
+  };
   return [volverMas,
+    hayAntiguos ? h('section', {class: 'card'},
+      h('h2', null, 'Datos antiguos en este dispositivo'),
+      h('p', {class: 'note'}, 'Quedan aquí los datos de antes de crear tu cuenta. Si ya los tienes en tu cuenta, bórralos para que nadie que use este dispositivo pueda verlos.'),
+      h('button', {class: 'btn dan', type: 'button', onclick: async () => {
+        if (!(await confirmar('Solo se borra la copia antigua de este dispositivo. Tu cuenta no cambia.', {titulo: '¿Borrar datos antiguos?', aceptar: 'Borrar', peligro: true}))) return;
+        ls.del(KEY); render(); toast('Datos antiguos borrados');
+      }}, 'Borrar datos antiguos')) : null,
     h('section', {class: 'card'},
       h('h2', null, 'Tu cuenta'),
       h('p', {class: 'note'}, 'Sesión iniciada como ', h('b', null, usuario ? usuario.email : '—'), '.'),
@@ -522,7 +561,11 @@ function vistaCuenta() {
             : h('button', {class: 'btn pri', type: 'button', onclick: async () => {
               try { await activarBio(); desbloqueado = true; render(); toast(nombreBio() + ' activado'); } catch (e) { toast(e && e.name === 'NotAllowedError' ? 'Cancelado' : 'No se pudo activar en este dispositivo'); }
             }}, 'Activar ' + nombreBio())]
-        : h('p', {class: 'note'}, 'Este dispositivo o navegador no permite desbloquear con ' + nombreBio() + '. En iPhone funciona con la app instalada desde Safari.'))];
+        : h('p', {class: 'note'}, 'Este dispositivo o navegador no permite desbloquear con ' + nombreBio() + '. En iPhone funciona con la app instalada desde Safari.')),
+    h('section', {class: 'card'},
+      h('h2', null, 'Eliminar cuenta'),
+      h('p', {class: 'note'}, 'Borra tu cuenta y todos tus datos de la nube para siempre.'),
+      h('button', {class: 'btn dan', type: 'button', onclick: eliminarCuenta}, 'Eliminar mi cuenta'))];
 }
 
 /* ───────────────────────── Arranque ───────────────────────── */
