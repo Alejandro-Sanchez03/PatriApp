@@ -822,31 +822,55 @@ function vistaGastos() {
 
 /* ───────────────────────── Vista: Saldos ───────────────────────── */
 
+/* Saldos escritos y aún sin guardar: se conservan si abres una cuenta para editarla. */
+const borradorSaldos = {};
+
 function vistaSaldos() {
   const fecha = h('input', {type: 'date', value: hoy(), id: 'f-foto', class: 'input-peq'});
-  const guardar = () => {
-    document.querySelectorAll('input[data-saldo]').forEach((inp) => {
-      const r = state.saldos.find((x) => x.id === inp.dataset.saldo);
-      if (r) r.saldo = coerce({t: 'money'}, inp.value);
-    });
+  const boton = h('button', {class: 'btn pri ancho', type: 'button'});
+  const cambios = () => state.saldos.filter((r) => r.id in borradorSaldos && coerce({t: 'money'}, borradorSaldos[r.id]) !== r.saldo).length;
+  const pintarBoton = () => {
+    const n = cambios();
+    boton.textContent = n ? 'Guardar ' + n + (n === 1 ? ' cambio' : ' cambios') : 'Guardar saldos';
+  };
+  boton.addEventListener('click', () => {
+    for (const r of state.saldos) if (r.id in borradorSaldos) r.saldo = coerce({t: 'money'}, borradorSaldos[r.id]);
+    for (const k of Object.keys(borradorSaldos)) delete borradorSaldos[k];
     if (fecha.value) fotoSaldos(fecha.value);
     save();
     render();
     toast('Saldos guardados');
-  };
+  });
+  pintarBoton();
+  const nueva = () => editRow('saldos', null, {grupo: 'Liquidez'});
   const total = sum(state.saldos, (r) => r.saldo);
   const out = [h('section', {class: 'heroe heroe-peq'}, h('span', {class: 'heroe-lbl'}, 'Total en tus cuentas'), h('span', {class: 'heroe-num'}, eur2.format(total)))];
-  if (state.saldos.length) {
+  if (!state.saldos.length) {
     out.push(h('section', {class: 'card'},
-      h('div', {class: 'card-cab'}, h('h2', null, 'Actualizar saldos'), h('a', {class: 'btn-txt', href: '#historial'}, 'Historial')),
-      h('ul', {class: 'lista'}, state.saldos.map((r) => h('li', {class: 'fila'},
-        avatarGrupo(r.grupo),
-        h('span', {class: 'fila-txt'}, h('span', null, r.cuenta), h('span', {class: 'e'}, [r.entidad, r.grupo].filter(Boolean).join(' · '))),
-        h('span', {class: 'input-euro'}, h('input', {type: 'number', step: '0.01', inputmode: 'decimal', value: String(r.saldo), 'data-saldo': r.id, 'aria-label': 'Saldo de ' + r.cuenta}), '€')))),
-      h('div', {class: 'fila-sep'}, h('label', {class: 'sub', for: 'f-foto'}, 'Fecha'), fecha),
-      h('button', {class: 'btn pri ancho', type: 'button', onclick: guardar}, 'Guardar saldos')));
+      h('p', {class: 'empty'}, 'Todavía no tienes cuentas.'),
+      h('button', {class: 'btn pri ancho', type: 'button', onclick: nueva}, 'Añadir mi primera cuenta')));
+    return out;
   }
-  out.push(tablaEditable('saldos', {titulo: 'Tus cuentas'}));
+  out.push(h('section', {class: 'card'},
+    h('div', {class: 'card-cab'}, h('h2', null, 'Tus cuentas'),
+      h('button', {class: 'btn-txt', type: 'button', onclick: nueva}, icono('mas'), 'Añadir')),
+    h('p', {class: 'note'}, 'Escribe lo que hay hoy en cada cuenta y guarda. Toca el nombre de una cuenta para cambiarla o borrarla.'),
+    h('ul', {class: 'lista'}, state.saldos.map((r) => {
+      const valor = r.id in borradorSaldos ? borradorSaldos[r.id] : String(r.saldo);
+      const input = h('input', {type: 'number', step: '0.01', inputmode: 'decimal', value: valor, 'data-saldo': r.id, 'aria-label': 'Saldo de ' + r.cuenta});
+      const marcar = () => input.classList.toggle('cambiado', coerce({t: 'money'}, input.value) !== r.saldo);
+      input.addEventListener('input', () => { borradorSaldos[r.id] = input.value; marcar(); pintarBoton(); });
+      marcar();
+      return h('li', {class: 'fila fila-saldo'},
+        h('button', {class: 'fila-editar', type: 'button', onclick: () => editRow('saldos', r.id), 'aria-label': 'Editar ' + r.cuenta},
+          avatarGrupo(r.grupo),
+          h('span', {class: 'fila-txt'}, h('span', null, r.cuenta), h('span', {class: 'e'}, [r.entidad, r.grupo].filter(Boolean).join(' · '))),
+          icono('lapiz', 'lapiz')),
+        h('span', {class: 'input-euro'}, input, '€'));
+    })),
+    h('div', {class: 'fila-sep'}, h('label', {class: 'sub', for: 'f-foto'}, 'Fecha de la actualización'), fecha),
+    boton,
+    h('a', {class: 'btn-txt centro-bloque', href: '#historial'}, icono('reloj'), 'Ver historial de saldos')));
   return out;
 }
 

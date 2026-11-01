@@ -463,3 +463,18 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 .tabla-json span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .tut-puntos[hidden] { display: none; }
 .pasos, .pasos .sin-num, .dato-copia, .tabla-json { grid-template-columns: minmax(0, 1fr); }
+
+/* ── Saldos en una sola lista ── */
+.fila-saldo { grid-template-columns: minmax(0, 1fr) auto !important; }
+.fila-editar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 0; background: none; padding: 0; text-align: left; color: inherit; cursor: pointer; min-width: 0; }
+.fila-editar:active { opacity: .6; }
+.fila-editar .lapiz { width: 15px; height: 15px; color: var(--muted); }
+.input-euro input.cambiado { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.centro-bloque { justify-self: center; }
+.fila-saldo { gap: 8px !important; }
+.fila-saldo .fila-editar { gap: 10px; }
+.fila-saldo .fila-txt > span:first-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+.fila-saldo .input-euro input[type=number] { width: 5.9rem; padding: 8px; }
+.fila-saldo .avatar { width: 36px; height: 36px; border-radius: 12px; }
+.fila-saldo .input-euro { gap: 3px; }
+.fila-saldo .input-euro input[type=number] { width: 6.6rem; padding: 8px 9px; }

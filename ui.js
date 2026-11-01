@@ -38,7 +38,8 @@ const ICONOS = {
   coche: '<path d="M4.5 16.5v-4l2-5h11l2 5v4z"/><path d="M4.5 16.5V19h2.5v-2.5M17 16.5V19h2.5v-2.5"/><circle cx="8" cy="13.5" r="1"/><circle cx="16" cy="13.5" r="1"/>',
   escudo: '<path d="M12 3.5 5 6v5.5c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6z"/>',
   billete: '<rect x="3" y="6.5" width="18" height="11" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
-  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>'
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  lapiz: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'
 };
 
 function icono(nombre, clase) {
