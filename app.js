@@ -485,6 +485,8 @@ function vistaPanel() {
       h('button', {class: 'btn ancho', type: 'button', onclick: () => editRow('movimientos', null, {fecha: hoy(), mes_nomina: rep.nomina, destino: destinos()[0]})}, 'Apuntar transferencia')));
   } else if (rep) {
     out.push(h('a', {class: 'aviso-fila', href: '#nominas'}, icono('check', 'ok'), 'Nómina de ' + mesNombre(rep.nomina) + ' repartida', icono('chevron', 'chev')));
+  } else if (st.saldos.length) {
+    out.push(h('a', {class: 'aviso-fila', href: '#nominas'}, icono('documento'), 'Apunta tu nómina para saber cuánto ahorrar', icono('chevron', 'chev')));
   }
 
   // Distribución
@@ -1010,7 +1012,7 @@ async function actualizarPrecios(manual) {
 const volver = (href = '#ajustes', texto = 'Ajustes') => h('a', {class: 'back', href}, icono('atras'), texto);
 
 function vistaNominas() {
-  return [volver(),
+  return [volver('#panel', 'Inicio'),
     tablaEditable('ingresos', {orden: (a, b) => (a.mes < b.mes ? 1 : -1)}),
     tablaEditable('movimientos', {orden: (a, b) => (a.fecha < b.fecha ? 1 : -1)})];
 }
@@ -1063,18 +1065,11 @@ function vistaAjustes() {
     h('ul', {class: 'grupo'},
       filaAjuste('#cuenta', 'usuario', '#76e78e', 'Cuenta y seguridad', correo),
       filaAjuste('#applepay', 'billete', '#f5f5f7', 'Pagos con Apple Pay', state.config.applePay ? 'Activado: los pagos se apuntan solos' : 'Desactivado')),
-    h('h3', {class: 'grupo-tit'}, 'Tu dinero'),
+    h('h3', {class: 'grupo-tit'}, 'Preferencias'),
     h('ul', {class: 'grupo'},
-      filaAjuste('#reglas', 'regla', '#22d3ee', 'Reglas y preferencias', 'Reparto de la nómina, TAE, colchón'),
-      filaAjuste('#fire', 'inversion', '#76e78e', 'Objetivo FIRE', 'Cuánto necesitas y cuándo llegas'),
-      filaAjuste('#nominas', 'documento', '#7aa2ff', 'Nóminas y transferencias'),
-      filaAjuste('#presupuesto', 'tarta', '#f472b6', 'Presupuesto'),
-      filaAjuste('#recurrentes', 'repetir', '#22d3ee', 'Gastos recurrentes', 'Se apuntan solos cada mes'),
-      filaAjuste('#resumen', 'hucha', '#76e78e', 'Resumen del mes', 'Ingresos, gastos y tasa de ahorro'),
-      filaAjuste('#historial', 'reloj', '#fbbf24', 'Historial de saldos')),
+      filaAjuste('#reglas', 'regla', '#22d3ee', 'Reglas y preferencias', 'Reparto de la nómina, TAE, colchón, precios')),
     h('h3', {class: 'grupo-tit'}, 'Datos'),
     h('ul', {class: 'grupo'},
-      filaAjuste('#importar', 'banco', '#7aa2ff', 'Importar del banco', 'Excel o CSV de BBVA u otro banco'),
       filaAjuste('#versiones', 'reloj', '#fbbf24', 'Historial de versiones', 'Vuelve atrás si algo sale mal'),
       filaAjuste('#datos', 'copia', '#94a3b8', 'Copia de seguridad', 'Exportar, importar o borrar')),
     h('h3', {class: 'grupo-tit'}, 'Ayuda'),
@@ -1177,7 +1172,7 @@ const VISTAS = {
   saldos: [vistaSaldos, 'saldos', 'Saldos'],
   ajustes: [vistaAjustes, 'ajustes', 'Ajustes'],
   reglas: [vistaReglas, 'ajustes', 'Reglas'],
-  nominas: [vistaNominas, 'ajustes', 'Nóminas'],
+  nominas: [vistaNominas, 'panel', 'Nóminas'],
   presupuesto: [vistaPresupuesto, 'gastos', 'Presupuesto'],
   historial: [vistaHistorial, 'saldos', 'Historial'],
   datos: [vistaDatos, 'ajustes', 'Copia de seguridad'],

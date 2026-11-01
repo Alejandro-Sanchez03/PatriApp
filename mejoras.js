@@ -96,7 +96,8 @@ function vistaResumen() {
           h('span', {class: 'b-ing', style: `height:${Math.max(2, x.ingresos / max * 100)}%`}),
           h('span', {class: 'b-gas', style: `height:${Math.max(2, Math.max(0, x.gastos) / max * 100)}%`})),
         h('span', {class: 'col-mes'}, mesNombre(x.m).slice(0, 3))))),
-      h('p', {class: 'note'}, 'Tasa de ahorro = (ingresos − gastos) / ingresos del mes. Por encima del 20 % es un buen ritmo.'))];
+      h('p', {class: 'note'}, 'Tasa de ahorro = (ingresos − gastos) / ingresos del mes. Por encima del 20 % es un buen ritmo.')),
+    h('a', {class: 'aviso-fila', href: '#nominas'}, icono('documento'), 'Nóminas y transferencias', icono('chevron', 'chev'))];
 }
 
 function tarjetaAhorro() {

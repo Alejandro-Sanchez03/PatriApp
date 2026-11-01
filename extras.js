@@ -90,7 +90,7 @@ function vistaFire() {
     save(); render(); toast('Calculado');
   });
 
-  return [
+  return [volver('#panel', 'Inicio'),
     h('section', {class: 'heroe'},
       h('span', {class: 'heroe-lbl'}, 'Tu número FIRE'),
       h('span', {class: 'heroe-num'}, eur0.format(f.objetivo)),
