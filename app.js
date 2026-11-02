@@ -641,13 +641,14 @@ function editRow(tabla, id, inicial) {
   dlg.onclose = null;
   // En los gastos, lo que te devuelven (Bizum, devoluciones) se elige con un selector en vez de con un signo menos.
   let devuelven = tabla === 'gastos' && Number(datos.importe) < 0;
+  let elegidoAMano = !!fila;
   const datosForm = tabla === 'gastos' && datos.importe != null && datos.importe !== '' ? {...datos, importe: Math.abs(Number(datos.importe))} : datos;
   const selector = tabla === 'gastos' ? h('div', {class: 'segmentos dos', role: 'group', 'aria-label': 'Tipo'}) : null;
   const pintarSelector = () => {
     if (!selector) return;
     selector.replaceChildren(
-      h('button', {class: 'seg' + (devuelven ? '' : ' activo'), type: 'button', 'aria-pressed': devuelven ? 'false' : 'true', onclick: () => { devuelven = false; pintarSelector(); }}, 'Gasto'),
-      h('button', {class: 'seg' + (devuelven ? ' activo ok' : ''), type: 'button', 'aria-pressed': devuelven ? 'true' : 'false', onclick: () => { devuelven = true; pintarSelector(); }}, 'Me devuelven'));
+      h('button', {class: 'seg' + (devuelven ? '' : ' activo'), type: 'button', 'aria-pressed': devuelven ? 'false' : 'true', onclick: () => { devuelven = false; elegidoAMano = true; pintarSelector(); }}, 'Gasto'),
+      h('button', {class: 'seg' + (devuelven ? ' activo ok' : ''), type: 'button', 'aria-pressed': devuelven ? 'true' : 'false', onclick: () => { devuelven = true; elegidoAMano = true; pintarSelector(); }}, 'Me devuelven'));
     const imp = form.querySelector('label.f:has(#f-importe)');
     if (imp && imp.firstChild) imp.firstChild.textContent = devuelven ? 'Importe que te devuelven' : 'Importe';
     const ayuda = form.querySelector('.ayuda-devuelven');
@@ -668,12 +669,20 @@ function editRow(tabla, id, inicial) {
     sch.ayuda && tabla !== 'gastos' ? h('p', {class: 'note'}, sch.ayuda) : null,
     fila ? h('button', {class: 'btn pel ancho', type: 'button', onclick: () => borrar(tabla, id)}, 'Borrar') : null].filter(Boolean));
   pintarSelector();
+  const concepto = tabla === 'gastos' && form.querySelector('#f-concepto');
+  if (concepto) concepto.addEventListener('input', () => {
+    if (elegidoAMano) return;
+    const bizum = esBizumRecibido(concepto.value);
+    if (bizum !== devuelven) { devuelven = bizum; pintarSelector(); }
+  });
   form.onsubmit = (ev) => {
     ev.preventDefault();
     if (!form.reportValidity()) return;
     const o = leerForm(form, sch.cols);
     if (tabla === 'gastos') o.importe = devuelven ? -Math.abs(o.importe) : Math.abs(o.importe);
-    let aviso = tabla === 'gastos' && devuelven ? 'Apuntado: te han devuelto ' + eur2.format(Math.abs(o.importe)) : 'Guardado';
+    let aviso = tabla === 'gastos' && devuelven
+      ? (esBizumRecibido(o.concepto) || esBizumRecibido(o.categoria) ? 'Te han hecho un Bizum de ' : 'Apuntado: te han devuelto ') + eur2.format(Math.abs(o.importe))
+      : 'Guardado';
     if (fila) Object.assign(fila, o);
     else {
       if (tabla === 'recurrentes') o.ultimo = primerMesRecurrente(o);
@@ -734,12 +743,16 @@ let mesGastosSel = null;
 let busquedaGastos = '';
 let filtroCategoria = null;
 
+/* ¿Es un Bizum que te han hecho? (y no uno que has enviado tú) */
+const esBizumRecibido = (texto) => /bizum/i.test(texto || '') && !/envi|pagu[eé]|mand[eé]/i.test(texto || '');
+const etiquetaDevuelto = (g) => (esBizumRecibido(g.concepto) || esBizumRecibido(g.categoria) ? 'Bizum' : 'devuelto');
+
 /* Fila de un gasto en una lista. */
 function filaGasto(g, conMes) {
   return h('li', null, h('button', {class: 'fila', type: 'button', onclick: () => editRow('gastos', g.id)},
     avatarCategoria(g.categoria),
     h('span', {class: 'fila-txt'}, h('span', null, g.concepto), h('span', {class: 'e'}, g.categoria + ' · ' + (conMes ? fechaLarga(g.fecha) : fechaCorta(g.fecha)))),
-    h('span', {class: 'fila-imp ' + (g.importe < 0 ? 'ok' : '')}, h('span', null, (g.importe < 0 ? '+' : '−') + eur2.format(Math.abs(g.importe))), g.importe < 0 ? h('span', {class: 'e ok'}, 'devuelto') : null)));
+    h('span', {class: 'fila-imp ' + (g.importe < 0 ? 'ok' : '')}, h('span', null, (g.importe < 0 ? '+' : '−') + eur2.format(Math.abs(g.importe))), g.importe < 0 ? h('span', {class: 'e ok'}, etiquetaDevuelto(g)) : null)));
 }
 
 function mesesDisponibles() {
@@ -796,7 +809,7 @@ function vistaGastos() {
             h('span', {class: 'track'},
               x.previsto ? h('span', {class: 'fill', style: `width:${x.previsto / max * 100}%;background:${color};opacity:.25`}) : null,
               h('span', {class: 'fill', style: `width:${Math.max(0, x.gastado) / max * 100}%;background:${pasa ? css('--bad') : color}`}))),
-          h('span', {class: 'fila-imp'}, h('span', {class: x.gastado < 0 ? 'ok' : pasa ? 'bad' : ''}, x.gastado < 0 ? '+' + eur2.format(-x.gastado) : eur2.format(x.gastado)), x.gastado < 0 ? h('span', {class: 'e ok'}, 'devuelto') : null, x.previsto ? h('span', {class: 'e'}, 'de ' + eur0.format(x.previsto)) : null)));
+          h('span', {class: 'fila-imp'}, h('span', {class: x.gastado < 0 ? 'ok' : pasa ? 'bad' : ''}, x.gastado < 0 ? '+' + eur2.format(-x.gastado) : eur2.format(x.gastado)), x.gastado < 0 ? h('span', {class: 'e ok'}, esBizumRecibido(x.concepto) ? 'Bizum' : 'devuelto') : null, x.previsto ? h('span', {class: 'e'}, 'de ' + eur0.format(x.previsto)) : null)));
       }))));
   }
 
