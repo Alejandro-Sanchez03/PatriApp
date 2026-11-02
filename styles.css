@@ -478,3 +478,8 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 .fila-saldo .avatar { width: 36px; height: 36px; border-radius: 12px; }
 .fila-saldo .input-euro { gap: 3px; }
 .fila-saldo .input-euro input[type=number] { width: 6.6rem; padding: 8px 9px; }
+
+.ultimo-pago { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.ultimo-pago .fila-txt > span:first-child { white-space: normal; }
+.ultimo-pago .fila-txt .e { white-space: normal; }
+.cab-tit { margin: 6px 0 0; font-size: .78rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }

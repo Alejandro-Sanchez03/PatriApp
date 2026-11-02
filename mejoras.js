@@ -393,13 +393,14 @@ async function recogerPagos() {
     if (error || !data || !data.length) return 0;
     const hechos = new Set(state.config.pagosProcesados || []);
     const mapa = aprenderCategorias();
-    let n = 0, prueba = false;
+    let n = 0, prueba = false, sinImporte = 0;
     for (const p of data) {
       if (hechos.has(p.id)) continue;
       hechos.add(p.id);
       if (p.comercio === 'PRUEBA PATRIAPP') { prueba = true; continue; }
       const importe = Math.abs(leerImporte(p.importe_texto));
-      if (!(importe > 0)) continue;
+      state.config.applePayUltimo = {creado: p.creado, importe: p.importe_texto || '', comercio: p.comercio || '', ok: importe > 0};
+      if (!(importe > 0)) { sinImporte++; continue; }
       const fecha = new Date(p.creado);
       const concepto = (p.comercio || '').trim() || 'Pago con Apple Pay';
       state.gastos.push({id: newId(), fecha: fecha.getFullYear() + '-' + String(fecha.getMonth() + 1).padStart(2, '0') + '-' + String(fecha.getDate()).padStart(2, '0'),
@@ -409,14 +410,53 @@ async function recogerPagos() {
     state.config.pagosProcesados = [...hechos].slice(-300);
     save();
     try { await sb.from('pagos_pendientes').delete().in('id', data.map((p) => p.id)); } catch (e) { /* se reintentará; ya están marcados */ }
-    if (n) { render(); toast(n === 1 ? 'Se ha añadido 1 pago con Apple Pay' : 'Se han añadido ' + n + ' pagos con Apple Pay'); }
+    if (sinImporte) { render(); toast('Ha llegado un pago sin importe: revisa la variable «Importe» del atajo'); }
+    else if (n) { render(); toast(n === 1 ? 'Se ha añadido 1 pago con Apple Pay' : 'Se han añadido ' + n + ' pagos con Apple Pay'); }
     else if (prueba) toast('¡El atajo funciona! Ya puedes pagar con Apple Pay');
+    if (location.hash === '#applepay') render();
     return n;
   } catch (e) {
     return 0;
   } finally {
     recogiendoPagos = false;
   }
+}
+
+/* Estado del atajo según el servidor (actualización 10). null = sin cargar. */
+let infoAtajo = null;
+async function cargarInfoAtajo() {
+  try {
+    const {data, error} = await sb.rpc('info_atajo');
+    infoAtajo = error ? {sinServidor: true} : (data || {});
+  } catch (e) { infoAtajo = {sinServidor: true}; }
+  if (location.hash === '#applepay') render();
+}
+const cuandoFue = (iso) => {
+  const d = new Date(iso), ahora = new Date();
+  const hora = d.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'});
+  const dias = Math.floor((new Date(ahora.toDateString()) - new Date(d.toDateString())) / 864e5);
+  return dias === 0 ? 'hoy a las ' + hora : dias === 1 ? 'ayer a las ' + hora : d.toLocaleDateString('es-ES', {day: 'numeric', month: 'long'}) + ' a las ' + hora;
+};
+function tarjetaUltimoPago() {
+  const srv = infoAtajo && !infoAtajo.cargando && !infoAtajo.sinServidor && infoAtajo.ultimo_pago ? infoAtajo : null;
+  const loc = state.config.applePayUltimo;
+  // Lo más reciente entre lo que sabe el servidor y lo que ha recogido la app
+  const ult = srv && (!loc || new Date(srv.ultimo_pago) >= new Date(loc.creado))
+    ? {creado: srv.ultimo_pago, importe: srv.ultimo_importe || '', comercio: srv.ultimo_comercio || '', ok: leerImporte(srv.ultimo_importe) !== 0 && Number.isFinite(leerImporte(srv.ultimo_importe))}
+    : loc;
+  if (!ult) {
+    return h('section', {class: 'card ultimo-pago'},
+      h('span', {class: 'avatar sm', style: '--c:#94a3b8'}, icono('reloj')),
+      h('div', {class: 'fila-txt'}, h('span', null, 'Aún no ha llegado ningún pago'), h('span', {class: 'e'}, 'Haz un pago con Apple Pay y vuelve aquí')));
+  }
+  return h('section', {class: 'card ultimo-pago'},
+    h('span', {class: 'avatar sm', style: '--c:' + (ult.ok ? '#76e78e' : '#f5b14c')}, icono(ult.ok ? 'check' : 'reloj')),
+    h('div', {class: 'fila-txt'},
+      h('span', null, 'Último pago recibido ' + cuandoFue(ult.creado)),
+      h('span', {class: 'e'}, ult.ok
+        ? [ult.comercio || 'Sin comercio', ' · ', ult.importe].join('')
+        : 'Llegó sin importe: en el atajo, el campo «importe» debe tener la variable «Importe»'),
+      srv && srv.recibidos ? h('span', {class: 'e'}, srv.recibidos + (srv.recibidos === 1 ? ' pago recibido' : ' pagos recibidos') + ' en total') : null));
 }
 
 function botonCopiar(texto, etiqueta) {
@@ -474,6 +514,8 @@ function vistaApplePay() {
     return out;
   }
 
+  if (infoAtajo === null) { infoAtajo = {cargando: true}; cargarInfoAtajo(); }
+  out.push(tarjetaUltimoPago());
   const token = codigoAtajo();
   const cuerpo = h('div', {class: 'tabla-json'},
     h('div', null, h('code', null, 'token'), h('span', null, 'Texto → tu código')),
@@ -486,11 +528,15 @@ function vistaApplePay() {
       h('li', null, 'Elige ', h('b', null, 'Transacción'), ' (o «Cartera»). Marca tus tarjetas, deja todas las categorías, elige ', h('b', null, 'Ejecutar inmediatamente'), ' y pulsa ', h('b', null, 'Siguiente'), ' → ', h('b', null, 'Nueva automatización en blanco'), '.'),
       h('li', null, 'Añade la acción ', h('b', null, 'Obtener contenido de URL'), ' y pega la dirección:'),
       h('li', {class: 'sin-num'}, datoCopiable('URL', urlAtajo(), 'URL')),
-      h('li', null, 'Toca la flecha ', h('b', null, '›'), ' de la acción: ', h('b', null, 'Método'), ' → POST. En ', h('b', null, 'Cabeceras'), ' añade:'),
-      h('li', {class: 'sin-num'}, datoCopiable('apikey', claveAtajo(), 'Clave'), datoCopiable('Content-Type', 'application/json', 'Content-Type')),
+      h('li', null, 'Toca el ', h('b', null, 'círculo azul ›'), ' que hay junto a la dirección para desplegar más opciones. ', h('b', null, 'Método'), ' → POST.'),
+      h('li', null, 'En ', h('b', null, 'Cabeceras'), ' añade ', h('b', null, 'dos'), ' cabeceras. En cada una, la clave va a la izquierda y el valor a la derecha:'),
+      h('li', {class: 'sin-num'},
+        h('p', {class: 'cab-tit'}, 'Cabecera 1'), datoCopiable('Clave (izquierda)', 'apikey', 'Clave'), datoCopiable('Valor (derecha)', claveAtajo(), 'Valor'),
+        h('p', {class: 'cab-tit'}, 'Cabecera 2'), datoCopiable('Clave (izquierda)', 'Content-Type', 'Clave'), datoCopiable('Valor (derecha)', 'application/json', 'Valor')),
       h('li', null, 'En ', h('b', null, 'Cuerpo de la solicitud'), ' elige ', h('b', null, 'JSON'), ' y añade tres campos de tipo Texto:'),
       h('li', {class: 'sin-num'}, cuerpo, token ? datoCopiable('Tu código (token)', token, 'Código') : h('p', {class: 'empty'}, 'El código se creó en otro dispositivo. Pulsa «Cambiar código» para verlo aquí.')),
-      h('li', null, 'Para «Importe» y «Comercio», toca el campo y elige la variable del pago que ofrece Atajos. Pulsa ', h('b', null, 'OK'), ' y listo.')),
+      h('li', null, 'En ', h('b', null, 'importe'), ' y ', h('b', null, 'comercio'), ' no escribas nada: toca la casilla y, en la barra que sale encima del teclado, elige ', h('b', null, '«Entrada del atajo»'), '. Tócala otra vez y elige ', h('b', null, '«Importe»'), ' (o «Comercio»). Debe quedar una píldora azul. Pulsa ', h('b', null, 'OK'), ' y listo.'),
+      h('li', null, h('b', null, 'Opcional:'), ' añade debajo la acción ', h('b', null, 'Mostrar notificación'), ' con la variable «Contenido de la URL». Al pagar verás «ok» si ha llegado.')),
     h('p', {class: 'note'}, 'El código solo sirve para añadir pagos a tu cuenta: no permite leer tus datos. No lo compartas.')));
   out.push(h('section', {class: 'card'},
     h('h2', null, 'Comprobar'),

@@ -1064,7 +1064,9 @@ function vistaAjustes() {
     h('h3', {class: 'grupo-tit'}, 'Cuenta'),
     h('ul', {class: 'grupo'},
       filaAjuste('#cuenta', 'usuario', '#76e78e', 'Cuenta y seguridad', correo),
-      filaAjuste('#applepay', 'billete', '#f5f5f7', 'Pagos con Apple Pay', state.config.applePay ? 'Activado: los pagos se apuntan solos' : 'Desactivado')),
+      filaAjuste('#applepay', 'billete', '#f5f5f7', 'Pagos con Apple Pay', state.config.applePay
+        ? (state.config.applePayUltimo ? 'Último pago ' + cuandoFue(state.config.applePayUltimo.creado) : 'Activado: esperando el primer pago')
+        : 'Desactivado')),
     h('h3', {class: 'grupo-tit'}, 'Preferencias'),
     h('ul', {class: 'grupo'},
       filaAjuste('#reglas', 'regla', '#22d3ee', 'Reglas y preferencias', 'Reparto de la nómina, TAE, colchón, precios')),
