@@ -1,0 +1,32 @@
+name: Notificaciones
+
+on:
+  schedule:
+    # 07:23, 12:23 y 18:23 UTC (≈ 8, 13 y 19 h en invierno; 9, 14 y 20 h en verano, hora de Madrid)
+    - cron: "23 7,12,18 * * *"
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "diario (avisos del día) o prueba (una notificación a todos los dispositivos)"
+        required: true
+        default: prueba
+        type: choice
+        options: [prueba, diario]
+
+permissions:
+  contents: read
+
+jobs:
+  avisos:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pywebpush>=2,<3"
+      - name: Enviar avisos
+        run: python scripts/notificar.py "${{ github.event.inputs.modo || 'diario' }}"

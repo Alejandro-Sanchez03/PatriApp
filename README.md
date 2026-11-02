@@ -28,6 +28,14 @@ App web instalable (PWA) para seguir el patrimonio: saldos por cuenta, gastos, n
 
 **Actualización 10 (una vez):** ejecuta igual `supabase/actualizacion-v10.sql`. Añade el «último pago recibido» en Pagos con Apple Pay.
 
+**Actualización 11 (una vez): notificaciones.**
+1. Ejecuta `supabase/actualizacion-v11.sql` en el SQL Editor.
+2. En GitHub → **Settings → Secrets and variables → Actions → New repository secret**, crea dos secretos:
+   - `VAPID_PRIVATE_KEY`: la clave privada de las notificaciones (la pública está en `config.js`).
+   - `SUPABASE_SERVICE_KEY`: en Supabase → **Project Settings → API Keys**, la clave **secreta** (`sb_secret_…` o `service_role`). Solo va aquí, nunca en el código.
+3. En la app: **Ajustes → Notificaciones → Activar** (en cada dispositivo).
+4. Para probar: **Actions → Notificaciones → Run workflow → prueba**.
+
 **Para las demás personas:** que creen su cuenta desde la app. Cuando estéis todos, cierra el registro en **Authentication → Sign In / Providers → Allow new users to sign up** (desactivado) y pon `registroAbierto: false` en `config.js`. Para añadir a alguien después: **Authentication → Users → Invite user** (recibirá un email para elegir contraseña).
 
 **A tener en cuenta del plan gratis:** Supabase pausa los proyectos sin uso durante 7 días seguidos; si pasa, entra en supabase.com y pulsa **Restore**. Los emails (confirmación, recuperar contraseña) tienen un límite de unos pocos por hora.

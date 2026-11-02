@@ -560,3 +560,132 @@ function vistaApplePay() {
         h('button', {class: 'btn dan', type: 'button', onclick: desactivar}, 'Desactivar'))));
   return out;
 }
+
+
+/* ───────────────────────── Notificaciones ───────────────────────── */
+
+const PREFS_AVISOS = {cartera: true, mensual: true, presupuesto: true, diaCobro: 0};
+let estadoAvisos = null;   // null = sin comprobar; {soportado, permiso, sub, prefs}
+
+const b64aBytes = (t) => { const p = '='.repeat((4 - t.length % 4) % 4); const b = atob((t + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+const bytesAb64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+async function comprobarAvisos() {
+  const soportado = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  let sub = null, prefs = {...PREFS_AVISOS, ...(state.config.avisos || {})};
+  if (soportado) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      sub = await reg.pushManager.getSubscription();
+      if (sub && nubeActiva()) {
+        const {data} = await sb.from('push_subs').select('prefs').eq('endpoint', sub.endpoint).maybeSingle();
+        if (data && data.prefs) prefs = {...prefs, ...data.prefs};
+      }
+    } catch (e) { /* sin service worker todavía */ }
+  }
+  estadoAvisos = {soportado, permiso: soportado ? Notification.permission : 'no', sub, prefs};
+  if (location.hash === '#notificaciones') render();
+}
+
+async function guardarSuscripcion(sub, prefs) {
+  const j = sub.toJSON();
+  const fila = {endpoint: sub.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, prefs};
+  const {error} = await sb.from('push_subs').upsert(fila, {onConflict: 'endpoint'});
+  if (error) throw error;
+}
+
+async function activarAvisos() {
+  const clave = (window.PATRIMONIO_CONFIG || {}).vapidPublicKey;
+  if (!clave) return toast('Falta la clave de notificaciones en config.js');
+  const permiso = await Notification.requestPermission();
+  if (permiso !== 'granted') { await comprobarAvisos(); return toast('Sin permiso: actívalo en Ajustes del iPhone → Notificaciones → PatriApp'); }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64aBytes(clave)});
+    const prefs = {...PREFS_AVISOS, ...(state.config.avisos || {})};
+    await guardarSuscripcion(sub, prefs);
+    state.config.avisos = prefs; save();
+    toast('Notificaciones activadas en este dispositivo');
+  } catch (e) {
+    toast(/push_subs|does not exist|schema cache/i.test(String(e && e.message)) ? 'Falta activar esta función en Supabase (actualización 11)' : 'No se pudieron activar: ' + (e && e.message || e));
+  }
+  comprobarAvisos();
+}
+
+async function desactivarAvisos() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      try { await sb.from('push_subs').delete().eq('endpoint', sub.endpoint); } catch (e) { /* nada */ }
+      await sub.unsubscribe();
+    }
+  } catch (e) { /* nada */ }
+  toast('Notificaciones desactivadas en este dispositivo');
+  comprobarAvisos();
+}
+
+async function guardarPrefsAvisos(prefs) {
+  state.config.avisos = prefs; save();
+  if (estadoAvisos && estadoAvisos.sub && nubeActiva()) {
+    try { await sb.from('push_subs').update({prefs}).eq('endpoint', estadoAvisos.sub.endpoint); } catch (e) { /* se reintenta al volver */ }
+  }
+  estadoAvisos = {...estadoAvisos, prefs};
+  toast('Guardado');
+}
+
+function vistaNotificaciones() {
+  if (estadoAvisos === null) { estadoAvisos = {cargando: true}; comprobarAvisos(); }
+  const e = estadoAvisos;
+  const out = [volver(),
+    h('section', {class: 'heroe heroe-peq'},
+      h('div', {class: 'apay-cab'}, h('span', {class: 'avatar', style: '--c:#fbbf24'}, icono('campana')),
+        e.cargando ? null : h('span', {class: 'pill ' + (e.sub ? 'pill-ok' : '')}, e.sub ? 'Activadas' : 'Desactivadas')),
+      h('span', {class: 'num-m'}, 'Notificaciones'),
+      h('span', {class: 'heroe-sub'}, 'Avisos en el móvil aunque la app esté cerrada. Se activan en cada dispositivo.'))];
+  if (e.cargando) { out.push(h('div', {class: 'cargando'})); return out; }
+  if (!nubeActiva()) { out.push(h('section', {class: 'card'}, h('p', {class: 'empty'}, 'Necesitas iniciar sesión con tu cuenta para recibir notificaciones.'))); return out; }
+  if (!e.soportado) {
+    out.push(h('section', {class: 'card'}, h('p', {class: 'empty'}, 'Este navegador no permite notificaciones. En iPhone funcionan con la app instalada en la pantalla de inicio desde Safari (iOS 16.4 o posterior): ábrela desde su icono.')));
+    return out;
+  }
+  if (!e.sub) {
+    out.push(h('section', {class: 'card'},
+      e.permiso === 'denied'
+        ? h('p', {class: 'note'}, 'Has bloqueado las notificaciones. Actívalas en Ajustes del iPhone → Notificaciones → PatriApp y vuelve aquí.')
+        : h('p', {class: 'note'}, 'Al activarlas, el iPhone te pedirá permiso.'),
+      h('button', {class: 'btn pri ancho', type: 'button', onclick: activarAvisos}, 'Activar notificaciones')));
+  }
+  const p = {...PREFS_AVISOS, ...e.prefs};
+  const chk = (k, ico, color, titulo, detalle) => {
+    const input = h('input', {type: 'checkbox', checked: !!p[k], 'aria-label': titulo});
+    input.addEventListener('change', () => guardarPrefsAvisos({...PREFS_AVISOS, ...estadoAvisos.prefs, [k]: input.checked}));
+    return h('li', null, h('label', {class: 'fila fila-chk'},
+      h('span', {class: 'avatar sm', style: '--c:' + color}, icono(ico)),
+      h('span', {class: 'fila-txt'}, h('span', null, titulo), h('span', {class: 'e'}, detalle)),
+      input));
+  };
+  const dia = h('input', {type: 'number', min: '0', max: '31', step: '1', inputmode: 'numeric', value: p.diaCobro ? String(p.diaCobro) : '', placeholder: '—', class: 'input-dia', 'aria-label': 'Día de cobro'});
+  dia.addEventListener('change', () => guardarPrefsAvisos({...PREFS_AVISOS, ...estadoAvisos.prefs, diaCobro: Math.max(0, Math.min(31, Math.round(Number(dia.value) || 0)))}));
+  out.push(h('h3', {class: 'grupo-tit'}, 'Qué quieres recibir'),
+    h('ul', {class: 'grupo'},
+      chk('cartera', 'inversion', '#76e78e', 'Tu cartera cada lunes', 'Lo que han ganado o perdido tus fondos al actualizar los precios'),
+      chk('mensual', 'reloj', '#7aa2ff', 'Resumen y recordatorio el día 1', 'Cuánto ahorraste el mes anterior y aviso para actualizar saldos'),
+      chk('presupuesto', 'tarta', '#f472b6', 'Presupuesto', 'Al llegar al 90 % de una categoría y si te pasas'),
+      h('li', null, h('div', {class: 'fila fila-chk'},
+        h('span', {class: 'avatar sm', style: '--c:#fbbf24'}, icono('documento')),
+        h('span', {class: 'fila-txt'}, h('span', null, 'Día de cobro'), h('span', {class: 'e'}, '«¿Has cobrado? Apunta la nómina» ese día. Vacío = sin aviso')),
+        dia))),
+    h('p', {class: 'note'}, 'Las notificaciones las envía GitHub varias veces al día (por la mañana, a mediodía y por la tarde), así que pueden llegar con unas horas de diferencia.'));
+  if (e.sub) {
+    out.push(h('section', {class: 'card'}, h('div', {class: 'btns'},
+      h('button', {class: 'btn', type: 'button', onclick: async () => {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification('PatriApp', {body: 'Así se verán tus avisos.', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'prueba'});
+        } catch (e) { toast('No se pudo mostrar: revisa el permiso en Ajustes del iPhone → Notificaciones → PatriApp'); }
+      }}, 'Probar en este dispositivo'),
+      h('button', {class: 'btn dan', type: 'button', onclick: desactivarAvisos}, 'Desactivar aquí'))));
+  }
+  return out;
+}

@@ -11,11 +11,16 @@ permissions:
 jobs:
   precios:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Guardar los precios de la semana anterior
+        run: cp precios.json "$RUNNER_TEMP/precios_prev.json" || true
       - name: Buscar precios
         run: python scripts/precios.py
       - name: Guardar precios.json
@@ -29,3 +34,9 @@ jobs:
             git commit -m "Precios de fondos $(date -u +%F)"
             git push
           fi
+      - name: Avisar de cómo ha ido la cartera
+        if: ${{ env.SUPABASE_SERVICE_KEY != '' && env.VAPID_PRIVATE_KEY != '' }}
+        continue-on-error: true
+        run: |
+          pip install "pywebpush>=2,<3"
+          python scripts/notificar.py cartera --prev "$RUNNER_TEMP/precios_prev.json"

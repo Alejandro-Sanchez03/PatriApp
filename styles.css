@@ -483,3 +483,9 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 .ultimo-pago .fila-txt > span:first-child { white-space: normal; }
 .ultimo-pago .fila-txt .e { white-space: normal; }
 .cab-tit { margin: 6px 0 0; font-size: .78rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
+
+/* ── Notificaciones ── */
+.fila-chk { grid-template-columns: auto minmax(0, 1fr) auto !important; cursor: pointer; }
+.fila-chk .fila-txt > span:first-child, .fila-chk .fila-txt .e { white-space: normal; }
+.fila-chk input[type=checkbox] { width: 22px; height: 22px; }
+.input-dia { width: 4.2rem !important; text-align: center; padding: 8px !important; }

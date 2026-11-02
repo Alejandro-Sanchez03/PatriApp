@@ -1069,6 +1069,7 @@ function vistaAjustes() {
         : 'Desactivado')),
     h('h3', {class: 'grupo-tit'}, 'Preferencias'),
     h('ul', {class: 'grupo'},
+      filaAjuste('#notificaciones', 'campana', '#fbbf24', 'Notificaciones', 'Cartera, resumen del mes, presupuesto, día de cobro'),
       filaAjuste('#reglas', 'regla', '#22d3ee', 'Reglas y preferencias', 'Reparto de la nómina, TAE, colchón, precios')),
     h('h3', {class: 'grupo-tit'}, 'Datos'),
     h('ul', {class: 'grupo'},
@@ -1187,6 +1188,7 @@ const VISTAS = {
   bienvenida: [() => vistaBienvenida(), 'panel', 'Bienvenida'],
   versiones: [() => vistaVersiones(), 'ajustes', 'Versiones'],
   applepay: [() => vistaApplePay(), 'ajustes', 'Apple Pay'],
+  notificaciones: [() => vistaNotificaciones(), 'ajustes', 'Notificaciones'],
   // direcciones antiguas
   cartera: [vistaInversion, 'inversion', 'Inversión'],
   mas: [vistaAjustes, 'ajustes', 'Ajustes']

@@ -9,5 +9,7 @@ window.PATRIMONIO_CONFIG = {
   supabaseAnonKey: 'sb_publishable_6QU8RYQtejSq0g-h6faFPg_PleTwKFZ',
   // Muestra «Crear una cuenta» en la pantalla de inicio. El registro de verdad se abre o cierra en
   // Supabase → Authentication → Sign In / Providers → «Allow new users to sign up».
+  // Clave pública de las notificaciones (la privada está solo en los secretos de GitHub).
+  vapidPublicKey: 'BI-KeIqi0CScVe1c88XW5NpkqytoHXVUPU4d7qMl5XJcIkBwkXnAIiTqQ8XQY0OllesNfD_Dz7X43x7pQarrBBM',
   registroAbierto: true
 };
