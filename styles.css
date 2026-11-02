@@ -489,3 +489,6 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 .fila-chk .fila-txt > span:first-child, .fila-chk .fila-txt .e { white-space: normal; }
 .fila-chk input[type=checkbox] { width: 22px; height: 22px; }
 .input-dia { width: 4.2rem !important; text-align: center; padding: 8px !important; }
+
+.segmentos.dos { grid-template-columns: 1fr 1fr; }
+.seg.activo.ok { color: var(--ok); }
