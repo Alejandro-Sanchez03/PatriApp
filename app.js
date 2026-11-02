@@ -61,13 +61,15 @@ const SCHEMAS = {
     ]
   },
   ingresos: {
-    titulo: 'Nóminas', nuevo: 'Nueva nómina',
+    titulo: 'Nóminas e ingresos', nuevo: 'Nueva nómina',
     ayuda: 'Marca «Reparto cerrado» cuando ya hayas movido el dinero de esa nómina.',
     cols: [
       {k: 'mes', l: 'Mes', t: 'month', req: true},
       {k: 'concepto', l: 'Concepto', t: 'text'},
       {k: 'importe', l: 'Importe', t: 'money', req: true},
-      {k: 'cerrada', l: 'Reparto cerrado', t: 'bool'}
+      {k: 'cerrada', l: 'Reparto cerrado', t: 'bool'},
+      {k: 'tipo', l: 'Tipo', t: 'text', oculto: true},     // '' o 'nomina' = nómina; 'otro' = dinero que te dan
+      {k: 'fecha', l: 'Fecha', t: 'date', oculto: true}
     ]
   },
   movimientos: {
@@ -277,8 +279,9 @@ function calcResumen(st) {
   };
 }
 
+const esNomina = (r) => (r.tipo || 'nomina') !== 'otro';
 function ultimaNomina(st) {
-  return st.ingresos.map((r) => r.mes).filter(Boolean).sort().pop() || null;
+  return st.ingresos.filter(esNomina).map((r) => r.mes).filter(Boolean).sort().pop() || null;
 }
 
 /* Gastos del mes siguiente a la última nómina: previsto (presupuesto) frente a gastado. */
@@ -326,7 +329,7 @@ function calcReparto(st, mesGastos) {
   const tr = Math.round(sobra * c.pctTR / 10) * 10;
   const idx = Math.floor((sobra - tr) / 10) * 10;
   const fila = (destino, importe, h) => ({destino, importe, hecho: h, pendiente: Math.max(0, importe - h)});
-  const cerrada = st.ingresos.some((r) => r.mes === nomina && r.cerrada);
+  const cerrada = st.ingresos.some((r) => r.mes === nomina && esNomina(r) && r.cerrada);
   const [d1, d2] = destinos();
   const rows = cerrada
     ? [fila(d1, hecho(d1), hecho(d1)), fila(d2, hecho(d2), hecho(d2)), {destino: 'Se queda en la cuenta corriente', importe: corrienteHoy, otra: true}]
@@ -647,12 +650,17 @@ function editRow(tabla, id, inicial) {
   let devuelven = tabla === 'gastos' && Number(datos.importe) < 0;
   let elegidoAMano = !!fila;
   const datosForm = tabla === 'gastos' && datos.importe != null && datos.importe !== '' ? {...datos, importe: Math.abs(Number(datos.importe))} : datos;
-  const selector = tabla === 'gastos' ? h('div', {class: 'segmentos dos', role: 'group', 'aria-label': 'Tipo'}) : null;
+  const selector = tabla === 'gastos' ? h('div', {class: 'segmentos tres', role: 'group', 'aria-label': 'Tipo'}) : null;
   const pintarSelector = () => {
     if (!selector) return;
     selector.replaceChildren(
       h('button', {class: 'seg' + (devuelven ? '' : ' activo'), type: 'button', 'aria-pressed': devuelven ? 'false' : 'true', onclick: () => { devuelven = false; elegidoAMano = true; pintarSelector(); }}, 'Gasto'),
-      h('button', {class: 'seg' + (devuelven ? ' activo ok' : ''), type: 'button', 'aria-pressed': devuelven ? 'true' : 'false', onclick: () => { devuelven = true; elegidoAMano = true; pintarSelector(); }}, 'Me devuelven'));
+      h('button', {class: 'seg' + (devuelven ? ' activo ok' : ''), type: 'button', 'aria-pressed': devuelven ? 'true' : 'false', onclick: () => { devuelven = true; elegidoAMano = true; pintarSelector(); }}, 'Me devuelven'),
+      h('button', {class: 'seg', type: 'button', 'aria-pressed': 'false', onclick: () => {
+        // Pasa a «Me dan dinero» conservando lo escrito; si se está editando un gasto, se convertirá en ingreso.
+        const el = form.elements;
+        nuevoIngresoExtra({fecha: el.fecha && el.fecha.value, concepto: el.concepto && el.concepto.value, importe: el.importe && el.importe.value}, fila ? fila.id : null);
+      }}, 'Me dan dinero'));
     const imp = form.querySelector('label.f:has(#f-importe)');
     if (imp && imp.firstChild) imp.firstChild.textContent = devuelven ? 'Importe que te devuelven' : 'Importe';
     const ayuda = form.querySelector('.ayuda-devuelven');

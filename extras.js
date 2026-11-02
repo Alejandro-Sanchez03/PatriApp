@@ -244,7 +244,7 @@ async function leerExtracto(archivo) {
     // ¿Ya apuntado? Mismo importe y fecha cercana (los recurrentes y el banco pueden ir con unos días de diferencia).
     const dia = toDate(fecha).getTime();
     if (r.tipo === 'gasto' && state.gastos.some((g) => Math.abs(g.importe - r.importe) < 0.005 && Math.abs(toDate(g.fecha).getTime() - dia) <= 5 * 864e5)) { r.incluir = false; r.nota = 'Ya lo tienes apuntado'; }
-    if (r.tipo === 'nomina' && state.ingresos.some((n) => n.mes === fecha.slice(0, 7))) { r.incluir = false; r.nota = 'Ya tienes la nómina de ese mes'; }
+    if (r.tipo === 'nomina' && state.ingresos.some((n) => n.mes === fecha.slice(0, 7) && esNomina(n))) { r.incluir = false; r.nota = 'Ya tienes la nómina de ese mes'; }
     out.push(r);
   }
   if (!out.length) throw new Error('El archivo no tiene movimientos que pueda leer.');

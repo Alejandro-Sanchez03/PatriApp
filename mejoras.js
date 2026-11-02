@@ -90,6 +90,16 @@ function vistaResumen() {
       h('div', {class: 'kpi'}, h('span', {class: 'kpi-lbl'}, 'Gastos'), h('span', {class: 'kpi-num'}, eur0.format(r.gastos))),
       h('div', {class: 'kpi'}, h('span', {class: 'kpi-lbl'}, 'Invertido'), h('span', {class: 'kpi-num'}, eur0.format(r.invertido)))),
     r.devuelto ? h('p', {class: 'note centro'}, 'Además te han devuelto ', h('b', {class: 'ok'}, eur0.format(r.devuelto)), ' (Bizum y devoluciones), que cuentan como dinero que entra.') : null,
+    (() => {
+      const otros = st.ingresos.filter((x) => x.mes === sel && !esNomina(x));
+      if (!otros.length) return null;
+      return h('section', {class: 'card'},
+        h('div', {class: 'card-cab'}, h('h2', null, 'Dinero que te han dado'), h('span', {class: 'num-m ok'}, '+' + eur0.format(sum(otros, (x) => x.importe)))),
+        h('ul', {class: 'lista'}, otros.map((x) => h('li', null, h('button', {class: 'fila', type: 'button', onclick: () => editRow('ingresos', x.id)},
+          h('span', {class: 'avatar sm', style: '--c:#76e78e'}, icono('billete')),
+          h('span', {class: 'fila-txt'}, h('span', null, x.concepto || 'Ingreso'), h('span', {class: 'e'}, x.fecha ? fechaCorta(x.fecha) : mesNombre(x.mes))),
+          h('span', {class: 'fila-imp ok'}, '+' + eur2.format(x.importe)))))));
+    })(),
     h('section', {class: 'card'},
       h('div', {class: 'card-cab'}, h('h2', null, 'Mes a mes'), media != null ? h('span', {class: 'sub'}, 'Media ' + pct0.format(media)) : null),
       h('div', {class: 'leyenda'}, h('span', null, h('span', {class: 'dot', style: 'background:var(--accent)'}), 'Ingresos'), h('span', null, h('span', {class: 'dot', style: 'background:var(--muted-bar)'}), 'Gastos')),
@@ -691,4 +701,58 @@ function vistaNotificaciones() {
       h('button', {class: 'btn dan', type: 'button', onclick: desactivarAvisos}, 'Desactivar aquí'))));
   }
   return out;
+}
+
+
+/* ───────────────────────── Dinero que te dan (no es gasto ni devolución) ───────────────────────── */
+
+/* Hoja «Me dan dinero»: se apunta como ingreso y se suma al saldo de la cuenta elegida.
+   reemplaza = id de un gasto que se convierte (por ejemplo, un Bizum apuntado como «Me devuelven»). */
+function nuevoIngresoExtra(inicial = {}, reemplaza = null) {
+  const dlg = document.getElementById('dialogo');
+  const form = document.getElementById('dialogo-form');
+  dlg.onclose = null;
+  const cuentas = state.saldos.slice().sort((a, b) => (a.grupo === 'Liquidez' ? -1 : 0) - (b.grupo === 'Liquidez' ? -1 : 0));
+  const volverA = (devolucion) => {
+    const el = form.elements;
+    const datos = {fecha: el.fecha.value, concepto: el.concepto.value, categoria: '', importe: (devolucion ? -1 : 1) * (coerce({t: 'money'}, el.importe.value) || 0) || ''};
+    if (reemplaza) editRow('gastos', reemplaza); else editRow('gastos', null, datos);
+  };
+  form.replaceChildren(...[
+    h('div', {class: 'asa', 'aria-hidden': 'true'}),
+    h('div', {class: 'hoja-cab'},
+      h('button', {class: 'btn-txt', type: 'button', onclick: () => dlg.close()}, 'Cancelar'),
+      h('h3', null, reemplaza ? 'Cambiar a ingreso' : 'Me dan dinero'),
+      h('button', {class: 'btn-txt fuerte', type: 'submit'}, 'Guardar')),
+    h('div', {class: 'segmentos tres', role: 'group', 'aria-label': 'Tipo'},
+      h('button', {class: 'seg', type: 'button', onclick: () => volverA(false)}, 'Gasto'),
+      h('button', {class: 'seg', type: 'button', onclick: () => volverA(true)}, 'Me devuelven'),
+      h('button', {class: 'seg activo ok', type: 'button', 'aria-pressed': 'true'}, 'Me dan dinero')),
+    h('div', {class: 'form'}, h('div', {class: 'row'},
+      h('label', {class: 'f'}, 'Fecha', h('input', {type: 'date', name: 'fecha', value: inicial.fecha || hoy(), required: true})),
+      h('label', {class: 'f'}, 'Concepto', h('input', {type: 'text', name: 'concepto', value: inicial.concepto || '', placeholder: 'Bizum de mamá', required: true, autocomplete: 'off'})),
+      h('label', {class: 'f'}, 'Importe que recibes', h('input', {type: 'number', name: 'importe', step: '0.01', inputmode: 'decimal', value: inicial.importe ? String(Math.abs(coerce({t: 'money'}, inicial.importe))) : '', required: true})),
+      cuentas.length ? h('label', {class: 'f'}, 'Entra en la cuenta', h('select', {name: 'cuenta'}, cuentas.map((c) => h('option', {value: c.id}, c.cuenta + (c.entidad ? ' · ' + c.entidad : ''))))) : null)),
+    cuentas.length ? h('label', {class: 'chk'}, h('input', {type: 'checkbox', name: 'sumar', checked: true}), 'Sumarlo al saldo de esa cuenta') : null,
+    h('p', {class: 'note'}, 'Para dinero que te dan y no es una devolución: un Bizum de tu familia, un regalo, algo que vendes… Cuenta como ingreso del mes y no toca tus gastos.')].filter(Boolean));
+  form.onsubmit = (ev) => {
+    ev.preventDefault();
+    if (!form.reportValidity()) return;
+    const el = form.elements;
+    const importe = Math.abs(coerce({t: 'money'}, el.importe.value));
+    if (!(importe > 0)) return toast('Pon un importe mayor que 0');
+    const fecha = el.fecha.value || hoy(), concepto = el.concepto.value.trim();
+    state.ingresos.push({id: newId(), mes: fecha.slice(0, 7), concepto, importe, cerrada: false, tipo: 'otro', fecha});
+    if (reemplaza) state.gastos = state.gastos.filter((g) => g.id !== reemplaza);
+    let destino = '';
+    if (el.cuenta && el.sumar && el.sumar.checked) {
+      const c = state.saldos.find((x) => x.id === el.cuenta.value);
+      if (c) { c.saldo = round2(c.saldo + importe); destino = ' · sumado a ' + c.cuenta; fotoSaldos(hoy()); }
+    }
+    save();
+    dlg.close();
+    render();
+    toast((esBizumRecibido(concepto) ? 'Te han hecho un Bizum de ' : 'Has recibido ') + eur2.format(importe) + destino);
+  };
+  abrirHoja();
 }

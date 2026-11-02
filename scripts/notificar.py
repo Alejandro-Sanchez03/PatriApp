@@ -181,7 +181,7 @@ def avisos_diarios(datos, prefs, enviados, ahora):
     # Día de cobro
     dia = int(num(prefs.get("diaCobro")))
     if dia > 0 and hoy.day == min(dia, calendar.monthrange(hoy.year, hoy.month)[1]):
-        ya = any(i.get("mes") == mes for i in datos.get("ingresos", []))
+        ya = any(i.get("mes") == mes and i.get("tipo") != "otro" for i in datos.get("ingresos", []))
         if not ya:
             out.append((f"cobro:{mes}", {"titulo": "💰 ¿Has cobrado?", "cuerpo": "Apunta la nómina y te digo cuánto mover a ahorro e inversión.", "url": "./#nominas", "etiqueta": "cobro"}))
     # Presupuesto

@@ -494,3 +494,6 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 .seg.activo.ok { color: var(--ok); }
 
 .heroe-sub.dos-lineas { flex-direction: column; gap: 2px; }
+
+.segmentos.tres { grid-template-columns: 1fr 1fr 1fr; }
+.segmentos.tres .seg { font-size: .82rem; padding: 10px 4px; }
