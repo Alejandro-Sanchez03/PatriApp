@@ -1,5 +1,5 @@
 {
-  "actualizado": "2026-10-31T17:52:10+00:00",
+  "actualizado": "2026-11-02T16:34:27+00:00",
   "fondos": {
     "IE00BYX5MX67": {
       "vl": 16.8,
@@ -23,11 +23,11 @@
       "vl_eur": 88.52
     },
     "IE00BYWYCC39": {
-      "vl": 19.28,
+      "vl": 18.97,
       "moneda": "EUR",
-      "fecha": "2026-10-29",
+      "fecha": "2026-10-30",
       "fuente": "Financial Times",
-      "vl_eur": 19.28
+      "vl_eur": 18.97
     },
     "IE00B246KL88": {
       "vl": 126.26,
@@ -62,8 +62,8 @@
       "moneda": "USD",
       "fecha": "2026-10-30",
       "fuente": "Financial Times",
-      "vl_eur": 7.55456,
-      "cambio_usd_eur": 0.89509
+      "vl_eur": 7.524935,
+      "cambio_usd_eur": 0.89158
     }
   },
   "errores": []
