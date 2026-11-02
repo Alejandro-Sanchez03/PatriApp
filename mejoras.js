@@ -48,10 +48,12 @@ function vistaRecurrentes() {
 
 function resumenMes(st, m) {
   const ingresos = sum(st.ingresos.filter((i) => i.mes === m), (i) => i.importe);
-  const gastos = sum(st.gastos.filter((g) => String(g.fecha).slice(0, 7) === m), (g) => g.importe);
+  const delMes = st.gastos.filter((g) => String(g.fecha).slice(0, 7) === m);
+  const gastos = sum(delMes.filter((g) => g.importe > 0), (g) => g.importe);        // lo que pagaste
+  const devuelto = -sum(delMes.filter((g) => g.importe < 0), (g) => g.importe);     // Bizum y devoluciones
   const invertido = sum(st.movimientos.filter((x) => x.mes_nomina === m), (x) => x.importe);
-  const ahorro = ingresos - gastos;
-  return {m, ingresos, gastos, invertido, ahorro, tasa: ingresos ? ahorro / ingresos : null};
+  const ahorro = ingresos + devuelto - gastos;
+  return {m, ingresos, gastos, devuelto, invertido, ahorro, tasa: ingresos ? ahorro / ingresos : null};
 }
 function mesesConMovimiento(st) {
   const set = new Set([hoy().slice(0, 7)]);
@@ -87,6 +89,7 @@ function vistaResumen() {
       h('div', {class: 'kpi'}, h('span', {class: 'kpi-lbl'}, 'Ingresos'), h('span', {class: 'kpi-num ok'}, eur0.format(r.ingresos))),
       h('div', {class: 'kpi'}, h('span', {class: 'kpi-lbl'}, 'Gastos'), h('span', {class: 'kpi-num'}, eur0.format(r.gastos))),
       h('div', {class: 'kpi'}, h('span', {class: 'kpi-lbl'}, 'Invertido'), h('span', {class: 'kpi-num'}, eur0.format(r.invertido)))),
+    r.devuelto ? h('p', {class: 'note centro'}, 'Además te han devuelto ', h('b', {class: 'ok'}, eur0.format(r.devuelto)), ' (Bizum y devoluciones), que cuentan como dinero que entra.') : null,
     h('section', {class: 'card'},
       h('div', {class: 'card-cab'}, h('h2', null, 'Mes a mes'), media != null ? h('span', {class: 'sub'}, 'Media ' + pct0.format(media)) : null),
       h('div', {class: 'leyenda'}, h('span', null, h('span', {class: 'dot', style: 'background:var(--accent)'}), 'Ingresos'), h('span', null, h('span', {class: 'dot', style: 'background:var(--muted-bar)'}), 'Gastos')),
@@ -121,10 +124,10 @@ function calcAvisos() {
   const mesHoy = hoy().slice(0, 7);
   const gm = calcGastosMes(st, mesHoy);
   for (const r of gm.rows) {
-    if (r.previsto > 0 && r.gastado >= r.previsto * 0.9) {
-      out.push({ico: estiloCategoria(r.concepto).ico, color: r.gastado > r.previsto ? '#ff7a7a' : '#f5b14c', href: '#gastos',
-        texto: r.gastado > r.previsto ? 'Te has pasado en ' + r.concepto : 'Llevas el ' + pct0.format(r.gastado / r.previsto) + ' de ' + r.concepto,
-        detalle: eur0.format(r.gastado) + ' de ' + eur0.format(r.previsto)});
+    if (r.previsto > 0 && r.neto >= r.previsto * 0.9) {
+      out.push({ico: estiloCategoria(r.concepto).ico, color: r.neto > r.previsto ? '#ff7a7a' : '#f5b14c', href: '#gastos',
+        texto: r.neto > r.previsto ? 'Te has pasado en ' + r.concepto : 'Llevas el ' + pct0.format(r.neto / r.previsto) + ' de ' + r.concepto,
+        detalle: eur0.format(r.neto) + ' de ' + eur0.format(r.previsto) + (r.devuelto ? ' (ya restado lo devuelto)' : '')});
     }
   }
   const hist = st.historial.map((x) => x.fecha).sort();

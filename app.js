@@ -289,16 +289,19 @@ function calcMesGastos(st) {
 
 /* Previsto (presupuesto) frente a gastado en un mes concreto, por categoría. */
 function calcGastosMes(st, mes) {
+  // gastado = lo que has pagado tú; devuelto = Bizum y devoluciones; neto = lo que te ha costado de verdad.
   const rows = st.presupuesto.filter((r) => r.mes === mes).map((r) => ({
-    concepto: r.concepto, previsto: r.cantidad * r.precio, gastado: 0, pendiente: r.pendiente
+    concepto: r.concepto, previsto: r.cantidad * r.precio, gastado: 0, devuelto: 0, pendiente: r.pendiente
   }));
   for (const g of st.gastos) {
     if (String(g.fecha).slice(0, 7) !== mes) continue;
-    const r = rows.find((x) => x.concepto === g.categoria);
-    if (r) r.gastado += g.importe;
-    else rows.push({concepto: g.categoria, previsto: 0, gastado: g.importe, pendiente: false});
+    let r = rows.find((x) => x.concepto === g.categoria);
+    if (!r) { r = {concepto: g.categoria, previsto: 0, gastado: 0, devuelto: 0, pendiente: false}; rows.push(r); }
+    if (g.importe >= 0) r.gastado += g.importe; else r.devuelto -= g.importe;
   }
-  return {mes, rows, previsto: sum(rows, (r) => r.previsto), gastado: sum(rows, (r) => r.gastado)};
+  rows.forEach((r) => { r.neto = r.gastado - r.devuelto; });
+  const gastado = sum(rows, (r) => r.gastado), devuelto = sum(rows, (r) => r.devuelto);
+  return {mes, rows, previsto: sum(rows, (r) => r.previsto), gastado, devuelto, neto: gastado - devuelto};
 }
 
 function calcColchon(st, mesGastos) {
@@ -466,7 +469,8 @@ function vistaPanel() {
     h('div', {class: 'fila-sep'},
       h('span', {class: 'num-m'}, eur2.format(gm.gastado)),
       gm.previsto ? h('span', {class: 'sub'}, 'de ' + eur0.format(gm.previsto)) : null),
-    gm.previsto ? h('span', {class: 'track'}, h('span', {class: 'fill', style: `width:${Math.min(100, Math.max(0, gm.gastado) / gm.previsto * 100)}%;background:${gm.gastado > gm.previsto ? css('--bad') : css('--accent')}`})) : null,
+    gm.previsto ? h('span', {class: 'track'}, h('span', {class: 'fill', style: `width:${Math.min(100, Math.max(0, gm.neto) / gm.previsto * 100)}%;background:${gm.neto > gm.previsto ? css('--bad') : css('--accent')}`})) : null,
+    gm.devuelto ? h('span', {class: 'sub'}, h('span', {class: 'ok'}, 'Te han devuelto ' + eur0.format(gm.devuelto)), ' · te ha costado ' + eur0.format(gm.neto)) : null,
     top.length ? h('div', {class: 'mini-cats'}, top.map((r) => h('span', {class: 'mini-cat'}, avatarCategoria(r.concepto), h('span', null, r.concepto), h('b', null, eur0.format(r.gastado))))) : null));
 
   // Ahorro del último mes con nómina
@@ -742,6 +746,7 @@ function tablaEditable(tabla, {orden, limite, cols, titulo} = {}) {
 let mesGastosSel = null;
 let busquedaGastos = '';
 let filtroCategoria = null;
+const DEVUELTOS = '__devueltos';
 
 /* ¿Es un Bizum que te han hecho? (y no uno que has enviado tú) */
 const esBizumRecibido = (texto) => /bizum/i.test(texto || '') && !/envi|pagu[eé]|mand[eé]/i.test(texto || '');
@@ -779,12 +784,13 @@ function vistaGastos() {
     h('span', {class: 'mes-nombre'}, mesLargo(sel)),
     h('button', {class: 'redondo', type: 'button', 'aria-label': 'Mes siguiente', disabled: i >= meses.length - 1, onclick: () => ir(meses[i + 1])}, icono('chevron'))));
 
-  const restante = gm.previsto - gm.gastado;
+  const restante = gm.previsto - gm.neto;
   out.push(h('section', {class: 'heroe heroe-centro'},
     h('span', {class: 'heroe-lbl'}, 'Gastado'),
     h('span', {class: 'heroe-num'}, eur2.format(gm.gastado)),
+    gm.devuelto ? h('span', {class: 'heroe-sub dos-lineas'}, h('span', {class: 'ok'}, 'Te han devuelto ' + eur2.format(gm.devuelto)), h('span', null, 'Te ha costado ', h('b', null, eur2.format(gm.neto)))) : null,
     gm.previsto
-      ? [h('span', {class: 'track grueso'}, h('span', {class: 'fill', style: `width:${Math.min(100, Math.max(0, gm.gastado) / gm.previsto * 100)}%;background:${restante < 0 ? css('--bad') : css('--accent')}`})),
+      ? [h('span', {class: 'track grueso'}, h('span', {class: 'fill', style: `width:${Math.min(100, Math.max(0, gm.neto) / gm.previsto * 100)}%;background:${restante < 0 ? css('--bad') : css('--accent')}`})),
         h('span', {class: 'heroe-sub'}, restante >= 0 ? ['Te quedan ', h('b', null, eur0.format(restante)), ' de ' + eur0.format(gm.previsto)] : h('span', {class: 'bad'}, 'Te has pasado ' + eur0.format(-restante) + ' de ' + eur0.format(gm.previsto)))]
       : h('span', {class: 'heroe-sub'}, delMes.length + ' movimientos · ', h('a', {href: '#presupuesto'}, 'poner presupuesto'))));
 
@@ -795,13 +801,13 @@ function vistaGastos() {
     h('a', {class: 'acceso-btn', href: '#importar'}, h('span', {class: 'avatar sm', style: '--c:#7aa2ff'}, icono('banco')), 'Importar')));
 
   if (gm.rows.length) {
-    const rows = gm.rows.slice().sort((a, b) => b.gastado - a.gastado || b.previsto - a.previsto);
+    const rows = gm.rows.filter((x) => x.gastado > 0 || x.previsto > 0).sort((a, b) => b.gastado - a.gastado || b.previsto - a.previsto);
     const max = Math.max(1, ...rows.map((x) => Math.max(x.previsto, x.gastado)));
     out.push(h('section', {class: 'card'},
       h('div', {class: 'card-cab'}, h('h2', null, 'Por categoría'), h('span', {class: 'sub'}, 'Toca para filtrar')),
       h('ul', {class: 'lista'}, rows.map((x) => {
         const color = estiloCategoria(x.concepto).color;
-        const pasa = x.previsto > 0 && x.gastado > x.previsto;
+        const pasa = x.previsto > 0 && x.neto > x.previsto;
         return h('li', null, h('button', {class: 'fila fila-cat' + (filtroCategoria === x.concepto ? ' sel' : ''), type: 'button', onclick: () => { filtroCategoria = filtroCategoria === x.concepto ? null : x.concepto; render(); }},
           avatarCategoria(x.concepto),
           h('span', {class: 'fila-txt'},
@@ -809,8 +815,23 @@ function vistaGastos() {
             h('span', {class: 'track'},
               x.previsto ? h('span', {class: 'fill', style: `width:${x.previsto / max * 100}%;background:${color};opacity:.25`}) : null,
               h('span', {class: 'fill', style: `width:${Math.max(0, x.gastado) / max * 100}%;background:${pasa ? css('--bad') : color}`}))),
-          h('span', {class: 'fila-imp'}, h('span', {class: x.gastado < 0 ? 'ok' : pasa ? 'bad' : ''}, x.gastado < 0 ? '+' + eur2.format(-x.gastado) : eur2.format(x.gastado)), x.gastado < 0 ? h('span', {class: 'e ok'}, esBizumRecibido(x.concepto) ? 'Bizum' : 'devuelto') : null, x.previsto ? h('span', {class: 'e'}, 'de ' + eur0.format(x.previsto)) : null)));
+          h('span', {class: 'fila-imp'}, h('span', {class: pasa ? 'bad' : ''}, eur2.format(x.gastado)),
+            x.devuelto ? h('span', {class: 'e ok'}, '−' + eur0.format(x.devuelto) + ' devuelto') : null,
+            x.previsto ? h('span', {class: 'e'}, 'de ' + eur0.format(x.previsto)) : null)));
       }))));
+  }
+
+  // Bizum y devoluciones, aparte de los gastos
+  const devueltos = delMes.filter((g) => g.importe < 0);
+  if (devueltos.length) {
+    const bizums = devueltos.filter((g) => esBizumRecibido(g.concepto) || esBizumRecibido(g.categoria));
+    out.push(h('section', {class: 'card'},
+      h('div', {class: 'card-cab'}, h('h2', null, 'Bizum y devoluciones'),
+        h('button', {class: 'btn-txt', type: 'button', onclick: () => { filtroCategoria = filtroCategoria === DEVUELTOS ? null : DEVUELTOS; render(); }}, filtroCategoria === DEVUELTOS ? 'Ver todo' : 'Ver')),
+      h('div', {class: 'fila-sep'},
+        h('span', {class: 'num-m ok'}, '+' + eur2.format(gm.devuelto)),
+        h('span', {class: 'sub'}, [bizums.length ? bizums.length + (bizums.length === 1 ? ' Bizum' : ' Bizum') : '', devueltos.length - bizums.length ? (devueltos.length - bizums.length) + (devueltos.length - bizums.length === 1 ? ' devolución' : ' devoluciones') : ''].filter(Boolean).join(' · '))),
+      h('p', {class: 'note'}, 'No restan de tus gastos: es dinero que te han devuelto. Lo que te ha costado el mes de verdad son ' + eur2.format(gm.neto) + '.')));
   }
 
   // Movimientos: del mes (con filtro de categoría) o resultados de búsqueda en todos los meses
@@ -824,7 +845,7 @@ function vistaGastos() {
       titulo.textContent = lista.length + ' resultados · ' + eur2.format(sum(lista, (g) => g.importe));
       vacio = 'Nada coincide con «' + busquedaGastos.trim() + '».';
     } else {
-      lista = filtroCategoria ? delMes.filter((g) => g.categoria === filtroCategoria) : delMes;
+      lista = filtroCategoria === DEVUELTOS ? delMes.filter((g) => g.importe < 0) : filtroCategoria ? delMes.filter((g) => g.categoria === filtroCategoria) : delMes;
       titulo.textContent = 'Movimientos · ' + lista.length;
       vacio = 'No hay gastos en ' + mesNombre(sel) + '. Pulsa + para añadir uno.';
     }
@@ -836,7 +857,7 @@ function vistaGastos() {
   out.push(h('section', {class: 'card'},
     h('div', {class: 'card-cab'}, titulo),
     buscador,
-    filtroCategoria && !busquedaGastos.trim() ? h('button', {class: 'chip-filtro', type: 'button', onclick: () => { filtroCategoria = null; render(); }}, avatarCategoria(filtroCategoria), filtroCategoria, h('span', {'aria-hidden': 'true'}, ' ✕')) : null,
+    filtroCategoria && !busquedaGastos.trim() ? h('button', {class: 'chip-filtro', type: 'button', onclick: () => { filtroCategoria = null; render(); }}, avatarCategoria(filtroCategoria === DEVUELTOS ? 'Bizum' : filtroCategoria), filtroCategoria === DEVUELTOS ? 'Bizum y devoluciones' : filtroCategoria, h('span', {'aria-hidden': 'true'}, ' ✕')) : null,
     contenedor));
 
   const ultimos = meses.filter((m) => m <= hoy().slice(0, 7)).slice(-6);

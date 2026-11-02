@@ -492,3 +492,5 @@ input.pin { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-we
 
 .segmentos.dos { grid-template-columns: 1fr 1fr; }
 .seg.activo.ok { color: var(--ok); }
+
+.heroe-sub.dos-lineas { flex-direction: column; gap: 2px; }
