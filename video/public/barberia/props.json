@@ -1,0 +1,17 @@
+{
+ "video": "barberia/montaje.mp4",
+ "duracion": 30.5,
+ "ambiente": "barberia/ambiente.wav",
+ "firma": "HORROR NIGHTS · TERRA MÍTICA",
+ "sustos": [5.0, 13.5, 20.5],
+ "textos": [
+  {"texto": "«¿Últimas palabras antes de morir?»", "s": 0.2, "e": 2.8},
+  {"texto": "Así de tranquilo entró…", "s": 2.9, "e": 5.0},
+  {"texto": "La Barbería Maldita", "s": 5.0, "e": 8.0, "tipo": "titulo"},
+  {"texto": "Desde fuera solo podíamos mirar", "s": 8.1, "e": 12.0},
+  {"texto": "Hasta que llegó ELLA", "s": 12.1, "e": 15.4, "tipo": "susto"},
+  {"texto": "Y salió así", "s": 15.5, "e": 20.4},
+  {"texto": "…y ella seguía detrás", "s": 20.5, "e": 25.4, "tipo": "susto", "pos": "arriba"},
+  {"texto": "¿Te atreverías a sentarte?", "s": 25.5, "e": 30.5}
+ ]
+}

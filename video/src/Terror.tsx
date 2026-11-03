@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import type { Frase, VideoProps } from "./Video";
 
-const ROJO = "#e11d2e";
+export const ROJO = "#e11d2e";
 
 // Niebla: manchas difusas que se desplazan despacio
 const Niebla: React.FC = () => {
@@ -27,7 +27,7 @@ const Niebla: React.FC = () => {
 };
 
 // Grano de película con semilla distinta en cada fotograma
-const Grano: React.FC = () => {
+export const Grano: React.FC = () => {
   const f = useCurrentFrame();
   return (
     <AbsoluteFill style={{ opacity: 0.13, mixBlendMode: "screen" }}>

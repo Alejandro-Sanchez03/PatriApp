@@ -2,3 +2,5 @@ node_modules/
 models/
 out/
 public/*/*.wav
+public/**/*.mp4
+public/**/*.mov
