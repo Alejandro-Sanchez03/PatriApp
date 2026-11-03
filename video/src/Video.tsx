@@ -4,12 +4,13 @@ import "@fontsource/montserrat/600.css";
 import {
   AbsoluteFill, Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig,
 } from "remotion";
+import { Terror } from "./Terror";
 
-type Palabra = { w: string; s: number; e: number };
-type Frase = { i: number; texto: string; s: number; e: number; palabras: Palabra[] };
+export type Palabra = { w: string; s: number; e: number };
+export type Frase = { i: number; texto: string; s: number; e: number; palabras: Palabra[]; tipo?: string };
 export type VideoProps = {
   id: string; titulo: string; audio: string; duracion: number; frases: Frase[];
-  estilo: { fondo?: string[]; acento?: string };
+  estilo: { fondo?: string[]; acento?: string; tema?: string }; ambiente?: string | null;
 };
 
 const Fondo: React.FC<{ colores: string[] }> = ({ colores }) => {
@@ -61,7 +62,9 @@ const Subtitulos: React.FC<{ frases: Frase[]; acento: string; vertical: boolean 
   );
 };
 
-export const Video: React.FC<VideoProps> = ({ audio, frases, estilo }) => {
+export const Video: React.FC<VideoProps> = (props) => {
+  const { audio, frases, estilo } = props;
+  if (estilo.tema === "terror") return <Terror {...props} />;
   const { width, height } = useVideoConfig();
   return (
     <AbsoluteFill>

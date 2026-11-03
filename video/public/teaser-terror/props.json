@@ -1,0 +1,273 @@
+{
+ "id": "teaser-terror",
+ "titulo": "Teaser: Horror Nights vs Horrorland",
+ "audio": "teaser-terror/voz.wav",
+ "duracion": 17.615,
+ "frases": [
+  {
+   "i": 0,
+   "texto": "HORROR NIGHTS",
+   "s": 0.0,
+   "e": 1.024,
+   "palabras": [
+    {
+     "w": "HORROR",
+     "s": 0.0,
+     "e": 0.512
+    },
+    {
+     "w": "NIGHTS",
+     "s": 0.512,
+     "e": 1.024
+    }
+   ],
+   "tipo": "titulo"
+  },
+  {
+   "i": 1,
+   "texto": "El domingo entré en Horror Nights de Terra Mítica.",
+   "s": 1.374,
+   "e": 4.361,
+   "palabras": [
+    {
+     "w": "El",
+     "s": 1.374,
+     "e": 1.576
+    },
+    {
+     "w": "domingo",
+     "s": 1.576,
+     "e": 2.032
+    },
+    {
+     "w": "entré",
+     "s": 2.032,
+     "e": 2.386
+    },
+    {
+     "w": "en",
+     "s": 2.386,
+     "e": 2.589
+    },
+    {
+     "w": "Horror",
+     "s": 2.589,
+     "e": 2.994
+    },
+    {
+     "w": "Nights",
+     "s": 2.994,
+     "e": 3.399
+    },
+    {
+     "w": "de",
+     "s": 3.399,
+     "e": 3.601
+    },
+    {
+     "w": "Terra",
+     "s": 3.601,
+     "e": 3.956
+    },
+    {
+     "w": "Mítica.",
+     "s": 3.956,
+     "e": 4.361
+    }
+   ]
+  },
+  {
+   "i": 2,
+   "texto": "Pensaba que estaba preparado.",
+   "s": 4.711,
+   "e": 6.631,
+   "palabras": [
+    {
+     "w": "Pensaba",
+     "s": 4.711,
+     "e": 5.234
+    },
+    {
+     "w": "que",
+     "s": 5.234,
+     "e": 5.525
+    },
+    {
+     "w": "estaba",
+     "s": 5.525,
+     "e": 5.991
+    },
+    {
+     "w": "preparado.",
+     "s": 5.991,
+     "e": 6.631
+    }
+   ]
+  },
+  {
+   "i": 3,
+   "texto": "No lo estaba.",
+   "s": 6.981,
+   "e": 8.047,
+   "palabras": [
+    {
+     "w": "No",
+     "s": 6.981,
+     "e": 7.247
+    },
+    {
+     "w": "lo",
+     "s": 7.247,
+     "e": 7.514
+    },
+    {
+     "w": "estaba.",
+     "s": 7.514,
+     "e": 8.047
+    }
+   ],
+   "tipo": "susto"
+  },
+  {
+   "i": 4,
+   "texto": "Y esto es solo el principio.",
+   "s": 8.397,
+   "e": 10.189,
+   "palabras": [
+    {
+     "w": "Y",
+     "s": 8.397,
+     "e": 8.555
+    },
+    {
+     "w": "esto",
+     "s": 8.555,
+     "e": 8.872
+    },
+    {
+     "w": "es",
+     "s": 8.872,
+     "e": 9.083
+    },
+    {
+     "w": "solo",
+     "s": 9.083,
+     "e": 9.399
+    },
+    {
+     "w": "el",
+     "s": 9.399,
+     "e": 9.61
+    },
+    {
+     "w": "principio.",
+     "s": 9.61,
+     "e": 10.189
+    }
+   ]
+  },
+  {
+   "i": 5,
+   "texto": "Porque después viene Horrorland.",
+   "s": 10.539,
+   "e": 12.587,
+   "palabras": [
+    {
+     "w": "Porque",
+     "s": 10.539,
+     "e": 10.994
+    },
+    {
+     "w": "después",
+     "s": 10.994,
+     "e": 11.506
+    },
+    {
+     "w": "viene",
+     "s": 11.506,
+     "e": 11.905
+    },
+    {
+     "w": "Horrorland.",
+     "s": 11.905,
+     "e": 12.587
+    }
+   ]
+  },
+  {
+   "i": 6,
+   "texto": "¿Cuál da más miedo de verdad?",
+   "s": 12.937,
+   "e": 14.815,
+   "palabras": [
+    {
+     "w": "¿Cuál",
+     "s": 12.937,
+     "e": 13.269
+    },
+    {
+     "w": "da",
+     "s": 13.269,
+     "e": 13.489
+    },
+    {
+     "w": "más",
+     "s": 13.489,
+     "e": 13.766
+    },
+    {
+     "w": "miedo",
+     "s": 13.766,
+     "e": 14.152
+    },
+    {
+     "w": "de",
+     "s": 14.152,
+     "e": 14.373
+    },
+    {
+     "w": "verdad?",
+     "s": 14.373,
+     "e": 14.815
+    }
+   ]
+  },
+  {
+   "i": 7,
+   "texto": "Sígueme. Te lo cuento todo.",
+   "s": 15.165,
+   "e": 16.765,
+   "palabras": [
+    {
+     "w": "Sígueme.",
+     "s": 15.165,
+     "e": 15.629
+    },
+    {
+     "w": "Te",
+     "s": 15.629,
+     "e": 15.836
+    },
+    {
+     "w": "lo",
+     "s": 15.836,
+     "e": 16.042
+    },
+    {
+     "w": "cuento",
+     "s": 16.042,
+     "e": 16.455
+    },
+    {
+     "w": "todo.",
+     "s": 16.455,
+     "e": 16.765
+    }
+   ]
+  }
+ ],
+ "estilo": {
+  "tema": "terror"
+ },
+ "ambiente": "teaser-terror/ambiente.wav"
+}

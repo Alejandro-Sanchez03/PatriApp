@@ -1,4 +1,4 @@
 node_modules/
 models/
 out/
-public/*/voz.wav
+public/*/*.wav

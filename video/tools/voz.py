@@ -63,10 +63,17 @@ def main(ruta):
         t += dur + PAUSA
 
     sf.write(dest / "voz.wav", np.concatenate(trozos), sr)
+    ambiente = None
+    if g.get("estilo", {}).get("tema") == "terror":
+        sys.path.insert(0, str(Path(__file__).parent))
+        import ambiente as amb
+        sustos = [f["s"] for f in frases if f.get("tipo") == "susto"]
+        sf.write(dest / "ambiente.wav", amb.generar(t + 0.5, sustos), amb.SR)
+        ambiente = f"{g['id']}/ambiente.wav"
     (dest / "subs.srt").write_text("\n".join(
         f"{f['i'] + 1}\n{srt_t(f['s'])} --> {srt_t(f['e'])}\n{f['texto']}\n" for f in frases), encoding="utf-8")
     props = {"id": g["id"], "titulo": g.get("titulo", ""), "audio": f"{g['id']}/voz.wav",
-             "duracion": round(t + 0.5, 3), "frases": frases, "estilo": g.get("estilo", {})}
+             "duracion": round(t + 0.5, 3), "frases": frases, "estilo": g.get("estilo", {}), "ambiente": ambiente}
     (dest / "props.json").write_text(json.dumps(props, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"OK {dest}  ({props['duracion']}s, {len(frases)} frases, voz {voz})")
 
