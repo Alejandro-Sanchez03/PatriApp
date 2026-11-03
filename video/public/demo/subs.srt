@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:02,411
+Hola, esto es una prueba del estudio de vídeo.
+
+2
+00:00:02,761 --> 00:00:06,537
+La voz, los subtítulos y la animación se generan automáticamente.
+
+3
+00:00:06,887 --> 00:00:08,828
+Y sale en vertical y en horizontal.
