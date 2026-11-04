@@ -1,0 +1,12 @@
+{
+  "id": "demo",
+  "titulo": "Prueba de sistema",
+  "voz": "ef_dora",
+  "velocidad": 1.05,
+  "estilo": { "fondo": ["#0f172a", "#1e3a8a"], "acento": "#facc15" },
+  "frases": [
+    "Hola, esto es una prueba del estudio de vídeo.",
+    "La voz, los subtítulos y la animación se generan automáticamente.",
+    "Y sale en vertical y en horizontal."
+  ]
+}

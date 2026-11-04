@@ -1,0 +1,17 @@
+{
+  "id": "teaser-terror",
+  "titulo": "Teaser: Horror Nights vs Horrorland",
+  "voz": "em_alex",
+  "velocidad": 0.92,
+  "estilo": { "tema": "terror" },
+  "frases": [
+    { "texto": "HORROR NIGHTS", "tipo": "titulo" },
+    "El domingo entré en Horror Nights de Terra Mítica.",
+    "Pensaba que estaba preparado.",
+    { "texto": "No lo estaba.", "tipo": "susto" },
+    "Y esto es solo el principio.",
+    "Porque después viene Horrorland.",
+    "¿Cuál da más miedo de verdad?",
+    "Sígueme. Te lo cuento todo."
+  ]
+}
