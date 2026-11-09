@@ -1,69 +1,69 @@
 {
-  "actualizado": "2026-11-02T16:34:27+00:00",
+  "actualizado": "2026-11-09T16:52:21+00:00",
   "fondos": {
     "IE00BYX5MX67": {
-      "vl": 16.8,
+      "vl": 16.37,
       "moneda": "EUR",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 16.8
+      "vl_eur": 16.37
     },
     "LU2349459045": {
-      "vl": 7963.15,
+      "vl": 7827.62,
       "moneda": "EUR",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 7963.15
+      "vl_eur": 7827.62
     },
     "IE0007471471": {
-      "vl": 88.52,
+      "vl": 88.78,
       "moneda": "EUR",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 88.52
+      "vl_eur": 88.78
     },
     "IE00BYWYCC39": {
-      "vl": 18.97,
+      "vl": 18.19,
       "moneda": "EUR",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 18.97
+      "vl_eur": 18.19
     },
     "IE00B246KL88": {
-      "vl": 126.26,
+      "vl": 128.39,
       "moneda": "EUR",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 126.26
+      "vl_eur": 128.39
     },
     "IE00BYX5N771": {
-      "vl": 10.53,
+      "vl": 9.76,
       "moneda": "EUR",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 10.53
+      "vl_eur": 9.76
     },
     "IE00BYX5MD61": {
-      "vl": 10.9,
+      "vl": 10.93,
       "moneda": "EUR",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 10.9
+      "vl_eur": 10.93
     },
     "IE00B1G3DH73": {
-      "vl": 51.87,
+      "vl": 50.47,
       "moneda": "EUR",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 51.87
+      "vl_eur": 50.47
     },
     "IE00BDZVHT63": {
-      "vl": 8.44,
+      "vl": 8.38,
       "moneda": "USD",
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-06",
       "fuente": "Financial Times",
-      "vl_eur": 7.524935,
-      "cambio_usd_eur": 0.89158
+      "vl_eur": 7.48686,
+      "cambio_usd_eur": 0.89342
     }
   },
   "errores": []
