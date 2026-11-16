@@ -1,69 +1,69 @@
 {
-  "actualizado": "2026-11-09T16:52:21+00:00",
+  "actualizado": "2026-11-16T16:27:52+00:00",
   "fondos": {
     "IE00BYX5MX67": {
-      "vl": 16.37,
+      "vl": 16.97,
       "moneda": "EUR",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 16.37
+      "vl_eur": 16.97
     },
     "LU2349459045": {
-      "vl": 7827.62,
+      "vl": 8073.61,
       "moneda": "EUR",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 7827.62
+      "vl_eur": 8073.61
     },
     "IE0007471471": {
-      "vl": 88.78,
+      "vl": 87.46,
       "moneda": "EUR",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 88.78
+      "vl_eur": 87.46
     },
     "IE00BYWYCC39": {
-      "vl": 18.19,
+      "vl": 18.98,
       "moneda": "EUR",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 18.19
+      "vl_eur": 18.98
     },
     "IE00B246KL88": {
-      "vl": 128.39,
+      "vl": 125.24,
       "moneda": "EUR",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 128.39
+      "vl_eur": 125.24
     },
     "IE00BYX5N771": {
-      "vl": 9.76,
+      "vl": 10.37,
       "moneda": "EUR",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 9.76
+      "vl_eur": 10.37
     },
     "IE00BYX5MD61": {
-      "vl": 10.93,
+      "vl": 11.2,
       "moneda": "EUR",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 10.93
+      "vl_eur": 11.2
     },
     "IE00B1G3DH73": {
-      "vl": 50.47,
+      "vl": 51.73,
       "moneda": "EUR",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 50.47
+      "vl_eur": 51.73
     },
     "IE00BDZVHT63": {
-      "vl": 8.38,
+      "vl": 8.35,
       "moneda": "USD",
-      "fecha": "2026-11-06",
+      "fecha": "2026-11-13",
       "fuente": "Financial Times",
-      "vl_eur": 7.48686,
-      "cambio_usd_eur": 0.89342
+      "vl_eur": 7.581299,
+      "cambio_usd_eur": 0.90794
     }
   },
   "errores": []
