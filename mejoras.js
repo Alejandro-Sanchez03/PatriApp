@@ -26,7 +26,7 @@ function aplicarRecurrentes() {
       if (fecha > hoy()) break;
       const ya = state.gastos.some((g) => String(g.fecha).slice(0, 7) === m && Math.abs(g.importe - r.importe) < 0.005 &&
         (g.concepto === r.concepto || g.categoria === r.categoria));
-      if (!ya) { state.gastos.push({id: newId(), fecha, concepto: r.concepto, categoria: r.categoria, importe: r.importe}); n++; }
+      if (!ya) { const g = {id: newId(), fecha, concepto: r.concepto, categoria: r.categoria, importe: r.importe, cuenta: cuentaPorDefecto()}; descontarGasto(g); state.gastos.push(g); n++; }
       r.ultimo = m;
       m = mesSiguiente(m);
     }
@@ -416,8 +416,10 @@ async function recogerPagos() {
       if (!(importe > 0)) { sinImporte++; continue; }
       const fecha = new Date(p.creado);
       const concepto = (p.comercio || '').trim() || 'Pago con Apple Pay';
-      state.gastos.push({id: newId(), fecha: fecha.getFullYear() + '-' + String(fecha.getMonth() + 1).padStart(2, '0') + '-' + String(fecha.getDate()).padStart(2, '0'),
-        concepto, categoria: sugerirCategoria(concepto, mapa), importe: round2(importe)});
+      const g = {id: newId(), fecha: fecha.getFullYear() + '-' + String(fecha.getMonth() + 1).padStart(2, '0') + '-' + String(fecha.getDate()).padStart(2, '0'),
+        concepto, categoria: sugerirCategoria(concepto, mapa), importe: round2(importe), cuenta: cuentaPorDefecto()};
+      descontarGasto(g);
+      state.gastos.push(g);
       n++;
     }
     state.config.pagosProcesados = [...hechos].slice(-300);
@@ -743,7 +745,7 @@ function nuevoIngresoExtra(inicial = {}, reemplaza = null) {
     if (!(importe > 0)) return toast('Pon un importe mayor que 0');
     const fecha = el.fecha.value || hoy(), concepto = el.concepto.value.trim();
     state.ingresos.push({id: newId(), mes: fecha.slice(0, 7), concepto, importe, cerrada: false, tipo: 'otro', fecha});
-    if (reemplaza) state.gastos = state.gastos.filter((g) => g.id !== reemplaza);
+    if (reemplaza) { const g = state.gastos.find((x) => x.id === reemplaza); if (g) devolverGasto(g); state.gastos = state.gastos.filter((x) => x.id !== reemplaza); }
     let destino = '';
     if (el.cuenta && el.sumar && el.sumar.checked) {
       const c = state.saldos.find((x) => x.id === el.cuenta.value);

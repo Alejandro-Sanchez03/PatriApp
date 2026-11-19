@@ -47,7 +47,8 @@ const SCHEMAS = {
       {k: 'cuenta', l: 'Cuenta', t: 'text', req: true},
       {k: 'entidad', l: 'Entidad', t: 'text'},
       {k: 'grupo', l: 'Grupo', t: 'select', opts: GRUPOS},
-      {k: 'saldo', l: 'Saldo', t: 'money'}
+      {k: 'saldo', l: 'Saldo', t: 'money'},
+      {k: 'actualizado', l: 'Saldo puesto a mano', t: 'text', oculto: true}   // cuándo pusiste el saldo real del banco
     ]
   },
   gastos: {
@@ -57,7 +58,10 @@ const SCHEMAS = {
       {k: 'fecha', l: 'Fecha', t: 'date', req: true},
       {k: 'concepto', l: 'Concepto', t: 'text', req: true},
       {k: 'categoria', l: 'Categoría', t: 'text', list: 'categorias', req: true},
-      {k: 'importe', l: 'Importe', t: 'money', req: true}
+      {k: 'importe', l: 'Importe', t: 'money', req: true},
+      {k: 'cuenta', l: 'Se paga desde', t: 'select', opts: () => opcionesCuentaGasto()},
+      {k: 'descontado', l: 'Descontado de', t: 'text', oculto: true},   // cuenta de la que se restó al apuntarlo
+      {k: 'creado', l: 'Apuntado', t: 'text', oculto: true}
     ]
   },
   ingresos: {
@@ -280,6 +284,43 @@ function calcResumen(st) {
 }
 
 const esNomina = (r) => (r.tipo || 'nomina') !== 'otro';
+
+/* ───── Gastos y saldos: cada gasto se resta de la cuenta desde la que se paga ───── */
+const SIN_CUENTA = 'No descontar';
+function cuentaPorDefecto() {
+  const c = state.saldos.find((r) => r.grupo === 'Liquidez') || state.saldos[0];
+  return c ? c.cuenta : SIN_CUENTA;
+}
+const opcionesCuentaGasto = () => [...state.saldos.map((r) => r.cuenta), SIN_CUENTA];
+const buscarCuenta = (nombre) => (nombre && nombre !== SIN_CUENTA ? state.saldos.find((r) => r.cuenta === nombre) : null);
+/* Última vez que se puso el saldo real de esa cuenta (o la última foto de saldos). */
+function saldoPuestoEl(c) {
+  if (c.actualizado) return c.actualizado;
+  const fotos = state.historial.map((x) => x.fecha).filter(Boolean).sort();
+  return fotos.length ? fotos[fotos.length - 1] : '';
+}
+/* Al apuntar un gasto: lo resta de su cuenta (un «Me devuelven» lo suma).
+   Los importados del banco solo cuentan si son posteriores a la última vez que pusiste el saldo real. */
+function descontarGasto(g, {delBanco = false} = {}) {
+  g.creado = new Date().toISOString();
+  g.descontado = '';
+  const c = buscarCuenta(g.cuenta);
+  if (!c) return null;
+  if (delBanco) { const f = saldoPuestoEl(c).slice(0, 10); if (f && g.fecha <= f) return null; }
+  c.saldo = round2(c.saldo - g.importe);
+  g.descontado = c.cuenta;
+  return c;
+}
+/* Deshace lo descontado (al borrar o editar), salvo que después pusieras el saldo real: ese ya lo incluye. */
+function devolverGasto(g) {
+  const c = buscarCuenta(g.descontado);
+  if (!c) return false;
+  const puesto = saldoPuestoEl(c);
+  if (puesto && (!g.creado || g.creado < puesto)) return false;
+  c.saldo = round2(c.saldo + g.importe);
+  g.descontado = '';
+  return true;
+}
 function ultimaNomina(st) {
   return st.ingresos.filter(esNomina).map((r) => r.mes).filter(Boolean).sort().pop() || null;
 }
@@ -649,7 +690,8 @@ function editRow(tabla, id, inicial) {
   // En los gastos, lo que te devuelven (Bizum, devoluciones) se elige con un selector en vez de con un signo menos.
   let devuelven = tabla === 'gastos' && Number(datos.importe) < 0;
   let elegidoAMano = !!fila;
-  const datosForm = tabla === 'gastos' && datos.importe != null && datos.importe !== '' ? {...datos, importe: Math.abs(Number(datos.importe))} : datos;
+  let datosForm = tabla === 'gastos' && datos.importe != null && datos.importe !== '' ? {...datos, importe: Math.abs(Number(datos.importe))} : datos;
+  if (tabla === 'gastos') datosForm = {...datosForm, cuenta: fila ? (fila.cuenta || SIN_CUENTA) : (datos.cuenta || cuentaPorDefecto())};
   const selector = tabla === 'gastos' ? h('div', {class: 'segmentos tres', role: 'group', 'aria-label': 'Tipo'}) : null;
   const pintarSelector = () => {
     if (!selector) return;
@@ -663,6 +705,8 @@ function editRow(tabla, id, inicial) {
       }}, 'Me dan dinero'));
     const imp = form.querySelector('label.f:has(#f-importe)');
     if (imp && imp.firstChild) imp.firstChild.textContent = devuelven ? 'Importe que te devuelven' : 'Importe';
+    const cta = form.querySelector('label.f:has(#f-cuenta)');
+    if (cta && cta.firstChild) cta.firstChild.textContent = devuelven ? 'Vuelve a la cuenta' : 'Se paga desde';
     const ayuda = form.querySelector('.ayuda-devuelven');
     if (ayuda) ayuda.hidden = !devuelven;
   };
@@ -695,8 +739,28 @@ function editRow(tabla, id, inicial) {
     let aviso = tabla === 'gastos' && devuelven
       ? (esBizumRecibido(o.concepto) || esBizumRecibido(o.categoria) ? 'Te han hecho un Bizum de ' : 'Apuntado: te han devuelto ') + eur2.format(Math.abs(o.importe))
       : 'Guardado';
-    if (fila) Object.assign(fila, o);
-    else {
+    if (tabla === 'gastos') {
+      const antes = fila ? {...fila} : null;
+      let c = null;
+      if (fila) {
+        const deshecho = devolverGasto(fila);
+        const cambiaCuenta = (antes.cuenta || SIN_CUENTA) !== o.cuenta;
+        Object.assign(fila, o);
+        if (deshecho || (!antes.descontado && cambiaCuenta)) c = descontarGasto(fila);
+      } else {
+        const g = {id: newId(), ...o};
+        c = descontarGasto(g);
+        state.gastos.push(g);
+      }
+      if (c) aviso += (o.importe >= 0 ? ' · −' + eur2.format(o.importe) + ' de ' : ' · +' + eur2.format(-o.importe) + ' a ') + c.cuenta;
+    } else if (fila) {
+      if (tabla === 'saldos' && o.saldo !== fila.saldo) o.actualizado = new Date().toISOString();
+      if (tabla === 'saldos' && o.cuenta !== fila.cuenta) {
+        // Los gastos siguen apuntando a la cuenta aunque cambie de nombre
+        for (const g of state.gastos) { if (g.cuenta === fila.cuenta) g.cuenta = o.cuenta; if (g.descontado === fila.cuenta) g.descontado = o.cuenta; }
+      }
+      Object.assign(fila, o);
+    } else {
       if (tabla === 'recurrentes') o.ultimo = primerMesRecurrente(o);
       state[tabla].push({id: newId(), ...o});
       if (tabla === 'movimientos' && form.elements.mover && form.elements.mover.checked) {
@@ -716,6 +780,7 @@ function editRow(tabla, id, inicial) {
 
 async function borrar(tabla, id) {
   if (!(await confirmar('Esta acción no se puede deshacer.', {titulo: '¿Borrar?', aceptar: 'Borrar', peligro: true}))) return;
+  if (tabla === 'gastos') { const g = state.gastos.find((r) => r.id === id); if (g) devolverGasto(g); }
   state[tabla] = state[tabla].filter((r) => r.id !== id);
   save();
   render();
@@ -896,7 +961,11 @@ function vistaSaldos() {
     boton.textContent = n ? 'Guardar ' + n + (n === 1 ? ' cambio' : ' cambios') : 'Guardar saldos';
   };
   boton.addEventListener('click', () => {
-    for (const r of state.saldos) if (r.id in borradorSaldos) r.saldo = coerce({t: 'money'}, borradorSaldos[r.id]);
+    const ahora = new Date().toISOString();
+    for (const r of state.saldos) {
+      if (r.id in borradorSaldos) r.saldo = coerce({t: 'money'}, borradorSaldos[r.id]);
+      r.actualizado = ahora;   // lo que escribes aquí es el saldo real: los gastos anteriores ya están incluidos
+    }
     for (const k of Object.keys(borradorSaldos)) delete borradorSaldos[k];
     if (fecha.value) fotoSaldos(fecha.value);
     save();
@@ -916,7 +985,7 @@ function vistaSaldos() {
   out.push(h('section', {class: 'card'},
     h('div', {class: 'card-cab'}, h('h2', null, 'Tus cuentas'),
       h('button', {class: 'btn-txt', type: 'button', onclick: nueva}, icono('mas'), 'Añadir')),
-    h('p', {class: 'note'}, 'Escribe lo que hay hoy en cada cuenta y guarda. Toca el nombre de una cuenta para cambiarla o borrarla.'),
+    h('p', {class: 'note'}, 'Los gastos se restan solos de la cuenta desde la que pagas. De vez en cuando, escribe aquí lo que te marca el banco y guarda: ese saldo manda. Toca el nombre de una cuenta para cambiarla o borrarla.'),
     h('ul', {class: 'lista'}, state.saldos.map((r) => {
       const valor = r.id in borradorSaldos ? borradorSaldos[r.id] : String(r.saldo);
       const input = h('input', {type: 'number', step: '0.01', inputmode: 'decimal', value: valor, 'data-saldo': r.id, 'aria-label': 'Saldo de ' + r.cuenta});

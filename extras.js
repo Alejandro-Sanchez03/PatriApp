@@ -295,7 +295,7 @@ function vistaImportar() {
     let n = 0;
     for (const r of filas.filter((x) => x.incluir)) {
       if (r.tipo === 'nomina') state.ingresos.push({id: newId(), mes: r.fecha.slice(0, 7), concepto: 'Nómina', importe: r.importe, cerrada: false});
-      else if (r.tipo === 'gasto') state.gastos.push({id: newId(), fecha: r.fecha, concepto: r.concepto, categoria: r.categoria || 'Otros', importe: r.importe});
+      else if (r.tipo === 'gasto') { const g = {id: newId(), fecha: r.fecha, concepto: r.concepto, categoria: r.categoria || 'Otros', importe: r.importe, cuenta: cuentaPorDefecto()}; descontarGasto(g, {delBanco: true}); state.gastos.push(g); }
       else continue;
       n++;
     }
